@@ -1,0 +1,23 @@
+# ============================================================
+# 本地开发环境配置（覆盖 application.yml）
+# 启动时添加 --spring.profiles.active=dev 激活
+# ============================================================
+
+spring:
+  application:
+    name: sld-faq-dev
+
+mybatis-plus:
+  configuration:
+    # 开发环境保留 SQL 日志，便于调试
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 企业微信 Mock 登录（本地无法访问真实企业微信时使用）
+# 开启后 POST /api/auth/mock-login 接口生效
+wecom:
+  mock-login: true
+
+logging:
+  level:
+    com.sld.faq: DEBUG
+    org.springframework.web: DEBUG

@@ -1,0 +1,33 @@
+# Environment
+.env
+
+# Backend
+sld-faq-backend/target/
+sld-faq-backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+
+# Frontend
+sld-faq-frontend/node_modules/
+sld-faq-frontend/dist/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker volumes (local dev)
+.docker/

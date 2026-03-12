@@ -1,0 +1,160 @@
+version: '3.8'
+
+# SLD FAQ 智能整理助手 — 服务编排
+#
+# 常规启动（不含 OCR）：
+#   docker-compose up -d
+#
+# 含 OCR 服务启动（需 NVIDIA 驱动 + nvidia-docker）：
+#   docker-compose --profile ocr up -d
+#
+# 环境变量：复制 .env.example 为 .env 并按需修改
+
+services:
+
+  # ─── 数据库 ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: sld-faq-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sld_faq
+      POSTGRES_USER: sld
+      POSTGRES_PASSWORD: sld123
+    volumes:
+      # 持久化数据库数据
+      - postgres_data:/var/lib/postgresql/data
+      # 容器首次启动时自动执行建表 + 初始化数据
+      - ./docs/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sld -d sld_faq"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── 缓存（Sa-Token JWT + 任务状态）────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: sld-faq-redis
+    restart: unless-stopped
+    # appendonly yes：开启 AOF 持久化，重启后缓存不丢失
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── 对象存储（存放上传的原始文件）──────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: sld-faq-minio
+    restart: unless-stopped
+    # --console-address ":9001" 开启 Web 控制台
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web 控制台
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── 后端（Spring Boot）──────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./sld-faq-backend
+      dockerfile: Dockerfile
+    container_name: sld-faq-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # 数据库连接
+      DB_HOST: postgres
+      DB_NAME: sld_faq
+      DB_USER: sld
+      DB_PASS: sld123
+      # Redis
+      REDIS_HOST: redis
+      # MinIO
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      # OCR 服务地址（带 ocr profile 时可用）
+      OCR_BASE_URL: http://ocr-service:8866
+      # LLM（OpenAI 兼容接口，默认指向宿主机 Ollama）
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-ollama}
+      LLM_MODEL_NAME: ${LLM_MODEL_NAME:-qwen2.5:14b}
+      # 企业微信 OAuth（从 .env 注入，未配置时为空）
+      WECOM_CORP_ID: ${WECOM_CORP_ID:-}
+      WECOM_CORP_SECRET: ${WECOM_CORP_SECRET:-}
+      WECOM_AGENT_ID: ${WECOM_AGENT_ID:-}
+      WECOM_REDIRECT_URI: ${WECOM_REDIRECT_URI:-}
+      # mock-login=true 时跳过企业微信 OAuth，方便本地开发
+      WECOM_MOCK_LOGIN: ${WECOM_MOCK_LOGIN:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # ─── 前端（Vue3 + Nginx）─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./sld-faq-frontend
+      dockerfile: Dockerfile
+    container_name: sld-faq-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  # ─── OCR 服务（GOT-OCR 2.0 / FastAPI）──────────────────────────────────
+  # 仅在 --profile ocr 时启动，需要 NVIDIA 显卡 + nvidia-docker
+  ocr-service:
+    build:
+      context: ./ocr-service
+      dockerfile: Dockerfile
+    container_name: sld-faq-ocr
+    restart: unless-stopped
+    ports:
+      - "8866:8866"
+    environment:
+      # 支持挂载本地已下载的模型目录，避免每次重新下载
+      MODEL_PATH: ${OCR_MODEL_PATH:-ucaslcl/GOT-OCR2_0}
+    volumes:
+      # 将 HuggingFace 模型缓存持久化，避免容器重建后重新下载
+      - ocr_models:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    profiles:
+      - ocr
+
+# ─── 持久化卷 ──────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  ocr_models:

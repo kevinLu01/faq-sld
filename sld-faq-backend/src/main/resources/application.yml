@@ -1,0 +1,86 @@
+spring:
+  application:
+    name: sld-faq
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/${DB_NAME:sld_faq}
+    username: ${DB_USER:sld}
+    password: ${DB_PASS:sld123}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+      password: ${REDIS_PASS:}
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+
+server:
+  port: 8080
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+sa-token:
+  token-name: Authorization
+  timeout: 86400
+  is-concurrent: false
+  is-share: false
+  token-style: uuid
+
+wecom:
+  corp-id: ${WECOM_CORP_ID:}
+  corp-secret: ${WECOM_CORP_SECRET:}
+  agent-id: ${WECOM_AGENT_ID:}
+  redirect-uri: ${WECOM_REDIRECT_URI:}
+  mock-login: ${WECOM_MOCK_LOGIN:false}
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  bucket: ${MINIO_BUCKET:sld-faq}
+
+llm:
+  base-url: ${LLM_BASE_URL:http://localhost:11434/v1}
+  api-key: ${LLM_API_KEY:ollama}
+  model-name: ${LLM_MODEL_NAME:qwen2.5:14b}
+  timeout: 60s
+
+ocr:
+  provider: local
+  enabled: true
+  local:
+    base-url: ${OCR_BASE_URL:http://localhost:8866}
+    timeout: 30s
+
+async:
+  faq-task:
+    core-pool-size: 4
+    max-pool-size: 8
+    queue-capacity: 100
+
+logging:
+  level:
+    com.sld.faq: DEBUG

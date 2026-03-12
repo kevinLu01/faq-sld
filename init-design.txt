@@ -1,0 +1,362 @@
+你现在是资深全栈架构师 + 高级工程师，请直接为我生成一个“可运行的 MVP 项目骨架 + 核心代码实现方案”。
+
+# 一、项目目标
+
+开发一个“企业微信内使用的 FAQ 智能整理助手”：
+- 运行形态：企业微信 H5 应用
+- 主要用户：资料提交人、业务审核人、知识管理员
+- 核心流程：上传资料 -> 自动解析清洗 -> 大模型生成 FAQ 候选 -> 人工审核 -> 发布为正式 FAQ
+- 使用场景：传统制造企业 / 空调配件企业内部知识整理
+- 第一版重点：移动端可用、流程打通、代码结构清晰、可扩展
+
+请直接输出一个适合真实开发落地的项目，不要只给伪代码。
+
+# 二、硬性要求
+
+## 1. 前端要求
+- 技术栈：Vue 3 + Vite + TypeScript + Vant + Pinia + Vue Router + Axios
+- 必须是手机端优先设计，适配企业微信内嵌浏览器
+- 页面风格简洁、卡片化、单列布局、适合 375px 宽度
+- 不做复杂 PC 后台
+- 所有主要操作按钮适合手指点击
+- 页面必须包含基础 loading / empty / error 状态
+
+## 2. 后端要求
+- 技术栈：Java 17 + Spring Boot 3 + Spring Web + Spring Security + JWT + JPA（或 MyBatis Plus 二选一，但要统一）+ PostgreSQL + Redis + MinIO
+- 代码风格要工程化，分层清晰
+- 提供 RESTful API
+- 提供统一响应体、全局异常处理、日志
+- 可通过 application.yml 配置企业微信、数据库、Redis、MinIO、大模型 API 地址等
+
+## 3. 企业微信接入要求
+- 实现企业微信 OAuth 登录流程
+- 适用于“企业微信内打开 H5 获取员工身份”
+- 需要包含以下能力：
+  1. 生成 OAuth 跳转地址
+  2. 前端处理 code / state
+  3. 后端根据 code 获取企业微信用户身份
+  4. 建立本地用户体系并签发 JWT
+  5. 角色权限控制
+- 代码中请预留“可信域名 / 回调地址 / corpId / secret / agentId”等配置项
+- 要考虑 state 防 CSRF、token 缓存、code 一次性消费、用户首次登录自动注册
+
+## 4. FAQ 能力要求
+- 支持上传 PDF / Word / Excel / txt / csv
+- 支持手工粘贴文本
+- 上传后可触发 FAQ 候选生成
+- FAQ 候选包含：
+  - question
+  - answer
+  - category
+  - keywords
+  - sourceSummary
+  - confidence
+- 支持人工审核操作：
+  - 通过
+  - 编辑后通过
+  - 驳回
+  - 合并到已有 FAQ
+- 审核通过后生成正式 FAQ
+
+## 5. 大模型接入要求
+- 不绑定具体厂商，使用通用 HTTP API 方式接入本地大模型
+- 封装一个 LlmClient
+- 预留模型接口配置：
+  - baseUrl
+  - apiKey
+  - modelName
+  - timeout
+- 实现“根据文本 chunk 生成 FAQ 候选”的调用
+- 强约束模型输出 JSON
+- 需要有容错处理：模型返回非 JSON、空响应、字段缺失时要处理
+
+# 三、业务边界
+
+第一版只做 MVP，不要做太多花哨功能。
+
+## 必须做的功能
+1. 企业微信 OAuth 登录
+2. 当前用户信息获取
+3. 文件上传
+4. 文本解析与清洗
+5. FAQ 候选生成
+6. FAQ 候选列表
+7. FAQ 候选详情
+8. 审核通过 / 驳回 / 编辑后通过 / 合并
+9. 正式 FAQ 列表
+10. FAQ 详情页
+
+## 暂不做的功能
+- 复杂 BI 报表
+- 多模型切换界面
+- OCR 深度识别
+- ERP / CRM 深度集成
+- 工作流引擎
+- 多租户
+- 国际化
+
+# 四、我需要你产出的内容
+
+请一次性给出以下内容，且尽量完整：
+
+## 1. 项目目录结构
+请分别给出：
+- 前端项目目录结构
+- 后端项目目录结构
+
+## 2. 架构设计说明
+说明：
+- 模块划分
+- 请求链路
+- OAuth 登录链路
+- FAQ 生成链路
+- 审核发布链路
+
+## 3. 数据库设计
+请输出 PostgreSQL 建表 SQL，至少包括：
+
+### 用户与权限
+- sys_user
+- sys_role
+- sys_user_role
+- sys_department
+
+### 文件与解析
+- kb_file
+- kb_chunk
+- kb_task
+
+### FAQ
+- faq_category
+- faq_candidate
+- faq_item
+- faq_source_ref
+
+字段要尽量完整，包含：
+- id
+- 状态字段
+- 创建更新时间
+- 创建人 / 审核人 / 发布人
+- 必要索引
+
+## 4. 后端核心代码
+请生成尽量完整的代码骨架，至少包括：
+
+### 配置类
+- SecurityConfig
+- JwtTokenProvider / JwtUtils
+- WeComProperties
+- MinioProperties
+- LlmProperties
+
+### 通用层
+- ApiResponse
+- GlobalExceptionHandler
+- BusinessException
+
+### 鉴权与用户
+- AuthController
+- UserController
+- AuthService
+- WeComOAuthService
+- JwtAuthenticationFilter
+- CustomUserDetailsService（如果你采用 Spring Security 用户体系）
+
+### 文件模块
+- FileController
+- FileService
+- FileEntity
+- FileRepository / Mapper
+- 文件上传到 MinIO 的实现
+- 文件元数据保存
+
+### 文档解析模块
+- DocumentParseService
+- PdfParser
+- WordParser
+- ExcelParser
+- TextCleaner
+- ChunkService
+
+### 模型调用模块
+- LlmClient
+- FaqGenerationService
+- PromptBuilder
+- JSON 输出解析器
+
+### FAQ 审核模块
+- FaqCandidateController
+- FaqCandidateService
+- FaqReviewService
+- FaqController
+
+### 实体 / DTO / VO
+请尽量补全
+
+## 5. 前端核心代码
+请输出 Vue3 项目核心骨架，至少包括：
+
+### 路由
+- /login
+- /home
+- /review/list
+- /review/detail/:id
+- /upload
+- /faq/list
+- /faq/detail/:id
+- /me
+
+### 页面
+- LoginPage.vue
+- HomePage.vue
+- ReviewListPage.vue
+- ReviewDetailPage.vue
+- UploadPage.vue
+- FaqListPage.vue
+- FaqDetailPage.vue
+- MePage.vue
+
+### 能力
+- Axios 请求封装
+- Token 存储
+- 登录拦截
+- 401 处理
+- Pinia 用户状态管理
+- 移动端页面样式
+- Vant 组件使用
+
+## 6. API 设计
+请输出 REST API 清单和示例请求/响应，至少包括：
+
+### OAuth
+- GET /api/auth/wecom/url
+- POST /api/auth/wecom/callback
+- GET /api/auth/me
+
+### 文件
+- POST /api/files/upload
+- GET /api/files/{id}
+- POST /api/files/{id}/generate-faq
+
+### FAQ 候选
+- GET /api/faq-candidates
+- GET /api/faq-candidates/{id}
+- POST /api/faq-candidates/{id}/approve
+- POST /api/faq-candidates/{id}/reject
+- POST /api/faq-candidates/{id}/edit-approve
+- POST /api/faq-candidates/{id}/merge
+
+### FAQ
+- GET /api/faqs
+- GET /api/faqs/{id}
+
+## 7. Prompt 设计
+请给出“文本 chunk -> FAQ 候选”的提示词模板，要求：
+- 中文
+- 严格 JSON 输出
+- 不允许编造原文中没有的信息
+- 适用于制造业、售后、产品资料场景
+
+## 8. application.yml 示例
+请给出完整配置示例，包括：
+- server
+- spring datasource
+- redis
+- jwt
+- minio
+- llm
+- wecom
+
+## 9. 本地启动说明
+请给出：
+- 后端启动步骤
+- 前端启动步骤
+- 本地联调说明
+- 企业微信 OAuth 本地开发的注意事项
+- 若本地无法直接联调 OAuth，如何先保留 mock 登录方案
+
+# 五、实现细节要求
+
+## 1. 登录与权限
+- 用户首次通过企业微信登录时，如果本地无账号则自动创建
+- 角色先采用默认 reviewer 或 submitter，可通过数据库初始化
+- 所有业务接口都要能拿到当前登录用户
+
+## 2. 文件上传
+- 上传文件后保存原文件到 MinIO
+- 数据库存文件元数据
+- 支持限制文件大小
+- 校验后缀白名单
+
+## 3. 文档解析
+- PDF：优先文本解析
+- Word：支持 docx
+- Excel：抽取表格单元格为文本
+- txt/csv：直接读取
+- 对解析结果做清洗：
+  - 去空行
+  - 去重复空白
+  - 去明显页眉页脚噪音
+- 切块时保留：
+  - fileId
+  - chunkIndex
+  - 原始内容
+  - 清洗内容
+  - metadata
+
+## 4. FAQ 生成
+- 一份文件可生成多个 chunk
+- 每个 chunk 生成 0~3 条 FAQ 候选
+- 模型输出需解析成结构化对象
+- 候选 FAQ 进入待审核状态
+- 记录来源文件和来源 chunk
+
+## 5. 审核逻辑
+- approve：直接通过，生成正式 FAQ
+- edit-approve：允许编辑问题和答案后通过
+- reject：记录驳回原因
+- merge：关联到已有 FAQ，并保留来源关系
+
+## 6. 移动端交互
+- 首页展示：
+  - 待审核数量
+  - 今日处理数
+  - 快捷入口
+- 审核详情页底部固定操作栏
+- 长文本支持折叠展开
+- 所有列表支持下拉刷新或“加载更多”的简单实现
+
+# 六、代码质量要求
+
+- 不要只给类名，尽量给可运行的实现
+- 所有重要类要有注释
+- DTO、VO、Entity 尽量补全
+- 不要偷懒只说“此处省略”
+- 如果代码过长，可以分批输出，但要按模块有序输出
+- 优先保证“后端能启动、前端能跑页面、接口链路清晰”
+
+# 七、输出顺序要求
+
+请严格按以下顺序输出：
+1. 整体架构说明
+2. 项目目录结构
+3. 数据库 SQL
+4. 后端代码
+5. 前端代码
+6. Prompt 模板
+7. application.yml
+8. 启动说明
+
+# 八、额外要求
+
+- 页面和接口命名统一
+- 变量名专业、可读
+- 不要把代码写成教学 demo 风格，要像实际企业项目
+- 需要保留后续扩展空间，例如：
+  - 向量库接入
+  - FAQ 搜索
+  - OCR
+  - 企业微信 JS-SDK
+- 对于企业微信 OAuth 部分，请把外部调用封装清晰，方便未来替换或增强
+
+现在开始输出。
