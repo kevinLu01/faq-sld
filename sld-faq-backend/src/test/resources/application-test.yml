@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+sa-token:
+  is-read-cookie: false
+  token-style: uuid
+wecom:
+  mock-login: true
+  corp-id: test
+  corp-secret: test
+  agent-id: test
+  redirect-uri: http://localhost
+llm:
+  base-url: http://localhost:11434/v1
+  api-key: test
+  model-name: test
+minio:
+  endpoint: http://localhost:9000
+  access-key: test
+  secret-key: test
+  bucket: test
+ocr:
+  enabled: false

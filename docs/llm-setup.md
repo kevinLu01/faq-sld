@@ -203,7 +203,112 @@ LLM_MODEL_NAME=qwen2.5:14b
 
 ---
 
-## 四、RTX 5090 显存规划（32GB）
+## 四、方案三：vLLM Docker（推荐生产）
+
+将 vLLM 作为 Docker 服务运行，与项目其他服务统一编排，无需单独管理 Python 环境。
+
+### 前提条件
+
+- NVIDIA 驱动 **≥ 570.xx**（RTX 5090 / Blackwell 架构要求）
+- CUDA **12.4+**
+- 已安装 **nvidia-container-toolkit**（原 nvidia-docker2）
+
+验证 nvidia-container-toolkit 已正确安装：
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.4-base-ubuntu22.04 nvidia-smi
+```
+
+输出中能看到 GPU 信息（RTX 5090）即表示环境就绪。
+
+**Windows 用户**：需要 WSL2 + Docker Desktop，并在 Docker Desktop Settings > Resources > GPU 中开启 GPU support。详见 [vLLM Docker 运维手册](./vllm-docker.md)。
+
+---
+
+### 一键启动
+
+```bash
+# 复制并配置环境变量
+cp .env.example .env
+# 编辑 .env，设置 HF_TOKEN（如需）和模型名称
+
+# 启动 vLLM 服务（首次启动会下载模型，约 28GB，需要等待）
+docker-compose --profile llm up -d vllm
+
+# 查看下载/启动进度
+docker logs -f sld-faq-vllm
+
+# 验证服务就绪
+curl http://localhost:8000/health
+curl http://localhost:8000/v1/models
+```
+
+---
+
+### 国内下载加速
+
+在 `.env` 中设置：
+
+```env
+HF_ENDPOINT=https://hf-mirror.com
+```
+
+vLLM 容器会自动使用该镜像地址下载模型，无需其他配置。
+
+---
+
+### 模型推荐（RTX 5090 32GB）
+
+| 模型 | 精度 | 显存占用 | 适用场景 |
+|---|---|---|---|
+| `Qwen/Qwen2.5-14B-Instruct` | BF16 全精度 | ~28GB | **推荐**，效果最优，RTX 5090 刚好装下 |
+| `Qwen/Qwen2.5-32B-Instruct-AWQ` | AWQ 量化 | ~20GB | 需要更大参数量时，量化损失极小 |
+
+在 `.env` 中切换模型：
+
+```env
+VLLM_MODEL=Qwen/Qwen2.5-14B-Instruct
+VLLM_SERVED_NAME=qwen2.5:14b
+```
+
+---
+
+### 与后端联调
+
+| 场景 | LLM_BASE_URL |
+|---|---|
+| Docker Compose 内（backend 容器访问 vllm 容器） | `http://vllm:8000/v1` |
+| 本地开发（IDE 直接运行 backend，访问 Docker 中的 vllm） | `http://localhost:8000/v1` |
+
+`.env` 配置（Docker 部署场景）：
+
+```env
+LLM_BASE_URL=http://vllm:8000/v1
+LLM_API_KEY=EMPTY
+LLM_MODEL_NAME=qwen2.5:14b
+```
+
+---
+
+### 完整启动顺序
+
+建议先等 vLLM 模型加载完毕，再启动其他服务，避免 backend 初始化时 LLM 连接失败：
+
+```bash
+# 第一步：启动 vLLM，等模型加载完
+docker-compose --profile llm up -d vllm
+docker logs -f sld-faq-vllm  # 看到 "Application startup complete" 后按 Ctrl+C
+
+# 第二步：启动其他服务（postgres / redis / minio / backend / frontend）
+docker-compose up -d
+
+# 如需同时启用 OCR 服务
+docker-compose --profile ocr up -d ocr-service
+```
+
+---
+
+## 六、RTX 5090 显存规划（32GB）
 
 | 组件 | 显存占用 | 备注 |
 |---|---|---|
@@ -221,7 +326,7 @@ LLM_MODEL_NAME=qwen2.5:14b
 
 ---
 
-## 五、FAQ 生成效果调优
+## 七、FAQ 生成效果调优
 
 ### 降低 JSON 输出随机性
 
@@ -279,7 +384,7 @@ ollama run faq-assistant
 
 ---
 
-## 六、常见问题
+## 八、常见问题
 
 ### RTX 5090 驱动版本要求
 
