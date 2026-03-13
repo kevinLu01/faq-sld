@@ -30,6 +30,7 @@ public class SaTokenConfig {
                 .addInclude("/**")
                 // 排除公开接口
                 .addExclude(
+                        "/api/auth/config",
                         "/api/auth/wecom/url",
                         "/api/auth/wecom/callback",
                         "/api/auth/mock-login"

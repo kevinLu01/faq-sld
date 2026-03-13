@@ -2,6 +2,9 @@ import request from './request'
 import type { UserInfo, LoginResponse } from '@/types'
 
 export const authApi = {
+  getConfig: () =>
+    request.get<{ mockLoginEnabled: boolean }, { mockLoginEnabled: boolean }>('/auth/config'),
+
   getWecomUrl: () => request.get<string, string>('/auth/wecom/url'),
 
   callback: (code: string, state: string) =>
@@ -9,7 +12,6 @@ export const authApi = {
 
   getMe: () => request.get<UserInfo, UserInfo>('/auth/me'),
 
-  // Mock login for development only
   mockLogin: (userId: string, name: string, role: string) =>
     request.post<LoginResponse, LoginResponse>('/auth/mock-login', { userId, name, role }),
 }

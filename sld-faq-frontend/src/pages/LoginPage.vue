@@ -27,7 +27,7 @@
       </div>
 
       <!-- Dev mock login -->
-      <div v-else-if="isDev" class="mock-login-area">
+      <div v-else-if="mockLoginEnabled" class="mock-login-area">
         <p class="mock-hint">开发模式 — 选择角色快速登录</p>
         <van-button
           type="primary"
@@ -78,7 +78,7 @@ const loading = ref(false)
 const loadingText = ref('正在登录...')
 const errorMsg = ref('')
 const mockLoading = ref(false)
-const isDev = import.meta.env.DEV
+const mockLoginEnabled = ref(false)
 
 async function handleWecomCallback(code: string, state: string) {
   loading.value = true
@@ -127,11 +127,11 @@ async function mockLogin(userId: string, name: string, role: string) {
 
 function retry() {
   errorMsg.value = ''
-  if (isDev) return
+  if (mockLoginEnabled.value) return
   redirectToWecom()
 }
 
-onMounted(() => {
+onMounted(async () => {
   // If already logged in, skip login page
   if (userStore.isLoggedIn) {
     router.replace('/home')
@@ -144,11 +144,21 @@ onMounted(() => {
   if (code && state) {
     // WeChat Work OAuth callback
     handleWecomCallback(code, state)
-  } else if (!isDev) {
-    // Production: redirect to WeChat Work OAuth
+    return
+  }
+
+  // Check if mock login is enabled on the backend
+  try {
+    const cfg = await authApi.getConfig()
+    mockLoginEnabled.value = cfg.mockLoginEnabled
+  } catch {
+    mockLoginEnabled.value = false
+  }
+
+  if (!mockLoginEnabled.value) {
     redirectToWecom()
   }
-  // Dev mode: show mock login buttons
+  // Mock mode: show mock login buttons
 })
 </script>
 
