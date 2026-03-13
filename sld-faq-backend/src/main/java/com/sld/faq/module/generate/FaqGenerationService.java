@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -138,33 +139,39 @@ public class FaqGenerationService {
 
             // 9. 遍历 chunks，逐块调 LLM 生成 FAQ 候选
             int total = savedChunks.size();
+            int llmFailureCount = 0;
+            int generatedCandidateCount = 0;
+            List<String> llmErrors = new ArrayList<>();
             for (int i = 0; i < total; i++) {
                 KbChunk chunk = savedChunks.get(i);
                 int progress = 20 + (i * 80 / total);
                 updateTask(taskId, "RUNNING", progress, null);
 
                 try {
-                    // a. 构建 prompt
                     String prompt = promptBuilder.build(chunk.getCleanContent(), PromptMode.DOCUMENT);
-
-                    // b. 调 LLM
                     String llmOutput = llmClient.chat(prompt);
-
-                    // c. 解析 JSON
                     List<FaqCandidateDto> candidates = faqJsonParser.parse(llmOutput);
-
-                    // d. 保存 FaqCandidate（状态 PENDING，通过代理调用确保事务生效）
                     self.saveCandidates(fileId, chunk.getId(), candidates);
-
+                    generatedCandidateCount += candidates.size();
                 } catch (Exception e) {
-                    log.warn("处理 chunk 时异常，跳过: fileId={}, chunkId={}, error={}", fileId, chunk.getId(), e.getMessage());
-                    // 单 chunk 失败不中断整体流程
+                    llmFailureCount++;
+                    llmErrors.add(buildChunkError(chunk.getId(), e));
+                    log.warn("处理 chunk 时异常，跳过: fileId={}, chunkId={}, error={}",
+                            fileId, chunk.getId(), e.getMessage());
                 }
             }
 
-            // 10. 更新 task 状态为 SUCCESS
+            // 10. 汇总结果，判断是否全部失败
+            log.info("FAQ 生成统计: taskId={}, candidates={}, llmFailures={}",
+                    taskId, generatedCandidateCount, llmFailureCount);
+            if (generatedCandidateCount == 0 && llmFailureCount > 0) {
+                failTask(taskId, buildGenerationFailureMessage(llmFailureCount, total, llmErrors));
+                return;
+            }
+
             updateTask(taskId, "SUCCESS", 100, null);
-            log.info("FAQ 生成任务完成: fileId={}, taskId={}, chunks={}", fileId, taskId, total);
+            log.info("FAQ 生成任务完成: fileId={}, taskId={}, chunks={}, candidates={}, llmFailures={}",
+                    fileId, taskId, total, generatedCandidateCount, llmFailureCount);
 
         } catch (Exception e) {
             log.error("FAQ 生成任务异常: fileId={}, taskId={}", fileId, taskId, e);
@@ -180,7 +187,7 @@ public class FaqGenerationService {
      */
     @Transactional(rollbackFor = Exception.class)
     public List<KbChunk> saveChunks(Long fileId, List<String> chunkTexts, String rawText, String cleanText) {
-        List<KbChunk> chunks = new java.util.ArrayList<>();
+        List<KbChunk> chunks = new ArrayList<>();
         for (int i = 0; i < chunkTexts.size(); i++) {
             String chunkContent = chunkTexts.get(i);
             KbChunk chunk = new KbChunk();
@@ -237,6 +244,22 @@ public class FaqGenerationService {
     private void failTask(Long taskId, String errorMsg) {
         log.warn("任务失败: taskId={}, error={}", taskId, errorMsg);
         updateTask(taskId, "FAILED", 0, errorMsg);
+    }
+
+    private String buildGenerationFailureMessage(int llmFailureCount, int totalChunks, List<String> llmErrors) {
+        String prefix = String.format("FAQ 生成失败：%d/%d 个 chunk 处理异常", llmFailureCount, totalChunks);
+        if (llmErrors.isEmpty()) {
+            return prefix;
+        }
+        return prefix + "； " + llmErrors.get(0);
+    }
+
+    private String buildChunkError(Long chunkId, Exception e) {
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) {
+            message = e.getClass().getSimpleName();
+        }
+        return String.format("chunkId=%d, error=%s", chunkId, message);
     }
 
     /**

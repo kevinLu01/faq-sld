@@ -143,7 +143,7 @@ services:
     container_name: sld-faq-vllm
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "18000:8000"
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
       - HF_ENDPOINT=${HF_ENDPOINT:-https://huggingface.co}
@@ -151,9 +151,10 @@ services:
       # 持久化模型缓存，避免容器重建后重新下载
       - vllm_models:/root/.cache/huggingface
     command: >
-      --model ${VLLM_MODEL:-Qwen/Qwen2.5-14B-Instruct}
+      --model ${VLLM_MODEL:-Qwen/Qwen2.5-14B-Instruct-AWQ}
       --served-model-name ${VLLM_SERVED_NAME:-qwen2.5:14b}
-      --dtype bfloat16
+      --dtype auto
+      --quantization awq
       --gpu-memory-utilization ${VLLM_GPU_UTIL:-0.85}
       --max-model-len ${VLLM_MAX_LEN:-8192}
       --port 8000
