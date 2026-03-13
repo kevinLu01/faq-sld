@@ -88,7 +88,8 @@ async function handleWecomCallback(code: string, state: string) {
     userStore.setToken(res.token)
     userStore.setUserInfo(res.user)
     showToast({ message: `欢迎回来，${res.user.name}`, type: 'success' })
-    router.replace('/home')
+    const redirect = route.query.redirect as string
+    router.replace(redirect || '/home')
   } catch {
     errorMsg.value = '企业微信授权失败，请重试'
   } finally {
@@ -115,7 +116,8 @@ async function mockLogin(userId: string, name: string, role: string) {
     userStore.setToken(res.token)
     userStore.setUserInfo(res.user)
     showToast({ message: `欢迎，${res.user.name}`, type: 'success' })
-    router.replace('/home')
+    const redirect = route.query.redirect as string
+    router.replace(redirect || '/home')
   } catch {
     showToast('模拟登录失败')
   } finally {

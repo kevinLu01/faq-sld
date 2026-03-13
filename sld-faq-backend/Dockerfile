@@ -1,7 +1,7 @@
 # ============================================================
 # Stage 1: 编译阶段
 # ============================================================
-FROM maven:3.9-eclipse-temurin-17 AS builder
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
 
 WORKDIR /build
 
@@ -14,9 +14,9 @@ COPY src ./src
 RUN mvn package -DskipTests -B
 
 # ============================================================
-# Stage 2: 运行阶段
+# Stage 2: 运行阶段（使用与构建阶段相同的镜像，避免额外拉取）
 # ============================================================
-FROM eclipse-temurin:17-jre-alpine
+FROM maven:3.9-eclipse-temurin-17-alpine
 
 WORKDIR /app
 

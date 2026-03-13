@@ -2,6 +2,7 @@ package com.sld.faq.module.file;
 
 import com.sld.faq.common.BusinessException;
 import com.sld.faq.infrastructure.storage.MinioStorage;
+import com.sld.faq.module.file.entity.KbFile;
 import com.sld.faq.module.file.entity.KbTask;
 import com.sld.faq.module.file.mapper.KbFileMapper;
 import com.sld.faq.module.file.mapper.KbTaskMapper;
@@ -14,6 +15,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -109,7 +116,10 @@ class FileServiceTest {
     @Test
     @DisplayName("上传恰好 50MB 的文件不应因大小抛出异常（边界值测试）")
     void upload_exactlyMaxSizeFile_doesNotThrowSizeException() throws Exception {
+        // Tika detects MIME by magic bytes; fill first bytes with PDF header so validation passes
         byte[] maxContent = new byte[(int) MAX_FILE_SIZE];
+        byte[] pdfHeader = "%PDF-1.4\n".getBytes(StandardCharsets.UTF_8);
+        System.arraycopy(pdfHeader, 0, maxContent, 0, pdfHeader.length);
         MockMultipartFile maxFile = new MockMultipartFile(
                 "file",
                 "刚好50MB.pdf",
@@ -120,7 +130,7 @@ class FileServiceTest {
         // 配置 MinIO mock 使其不抛异常
         when(minioStorage.upload(anyString(), any(), anyLong(), anyString()))
                 .thenReturn("kb-files/刚好50MB.pdf");
-        when(kbFileMapper.insert(any())).thenReturn(1);
+        when(kbFileMapper.insert(any(KbFile.class))).thenReturn(1);
 
         // 不抛大小超限异常（可能因其他原因失败，但不是大小问题）
         // 此处验证大小校验通过
@@ -147,13 +157,21 @@ class FileServiceTest {
     @Test
     @DisplayName("允许的文件类型（pdf, docx, xlsx, txt, csv）不应因类型校验抛出异常")
     void upload_allowedFileTypes_passSizeAndTypeValidation() throws Exception {
-        String[] allowedTypes = {"report.pdf", "handbook.docx", "data.xlsx", "readme.txt", "export.csv"};
+        // Each entry: filename → content bytes that Tika will identify as a valid MIME type
+        String[][] cases = {
+            {"report.pdf",    "pdf"},
+            {"handbook.docx", "docx"},
+            {"data.xlsx",     "xlsx"},
+            {"readme.txt",    "txt"},
+            {"export.csv",    "csv"}
+        };
 
-        for (String filename : allowedTypes) {
-            MockMultipartFile file = new MockMultipartFile("file", filename, "text/plain", new byte[1024]);
+        for (String[] c : cases) {
+            byte[] content = buildSampleBytes(c[1]);
+            MockMultipartFile file = new MockMultipartFile("file", c[0], "application/octet-stream", content);
             when(minioStorage.upload(anyString(), any(), anyLong(), anyString()))
-                    .thenReturn("kb-files/" + filename);
-            when(kbFileMapper.insert(any())).thenReturn(1);
+                    .thenReturn("kb-files/" + c[0]);
+            when(kbFileMapper.insert(any(KbFile.class))).thenReturn(1);
 
             // 不应因类型校验失败
             fileService.upload(file, 1L);
@@ -161,6 +179,65 @@ class FileServiceTest {
 
         // 5 个文件都应调用 MinIO 上传
         verify(minioStorage, times(5)).upload(anyString(), any(), anyLong(), anyString());
+    }
+
+    /** 构造 Tika 可正确识别 MIME 类型的最小字节序列 */
+    private byte[] buildSampleBytes(String type) throws IOException {
+        switch (type) {
+            case "pdf":
+                return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n".getBytes(StandardCharsets.UTF_8);
+            case "txt":
+                return "This is a plain text document for testing purposes.".getBytes(StandardCharsets.UTF_8);
+            case "csv":
+                return "name,age,city\nAlice,30,Beijing\nBob,25,Shanghai".getBytes(StandardCharsets.UTF_8);
+            case "docx":
+                return buildOoxmlZip("application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml");
+            case "xlsx":
+                return buildOoxmlZip("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml");
+            default:
+                return new byte[1024];
+        }
+    }
+
+    /**
+     * 构造包含完整 OOXML 结构的最小 ZIP，使 Tika 能精确识别 docx/xlsx。
+     * docEntry: DOCX 用 "word/document.xml"，XLSX 用 "xl/workbook.xml"
+     */
+    private byte[] buildOoxmlZip(String documentContentType) throws IOException {
+        boolean isDocx = documentContentType.contains("wordprocessingml");
+        String docEntry = isDocx ? "word/document.xml" : "xl/workbook.xml";
+        String relTarget = isDocx ? "word/document.xml" : "xl/workbook.xml";
+        String relType = isDocx
+                ? "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+                : "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(baos)) {
+            // [Content_Types].xml
+            zip.putNextEntry(new ZipEntry("[Content_Types].xml"));
+            String ct = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                    + "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">"
+                    + "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>"
+                    + "<Override PartName=\"/" + docEntry + "\" ContentType=\"" + documentContentType + "\"/>"
+                    + "</Types>";
+            zip.write(ct.getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+
+            // _rels/.rels
+            zip.putNextEntry(new ZipEntry("_rels/.rels"));
+            String rels = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                    + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+                    + "<Relationship Id=\"rId1\" Type=\"" + relType + "\" Target=\"" + relTarget + "\"/>"
+                    + "</Relationships>";
+            zip.write(rels.getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+
+            // Minimal document entry
+            zip.putNextEntry(new ZipEntry(docEntry));
+            zip.write("<root/>".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        return baos.toByteArray();
     }
 
     // ========== getTaskStatus 测试 ==========

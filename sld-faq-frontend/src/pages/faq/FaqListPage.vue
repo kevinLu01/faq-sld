@@ -40,7 +40,7 @@
             @click="router.push(`/faq/detail/${item.id}`)"
           >
             <div class="faq-header">
-              <van-tag v-if="item.categoryName" type="primary" plain size="small">
+              <van-tag v-if="item.categoryName" type="primary" plain>
                 {{ item.categoryName }}
               </van-tag>
               <span class="view-count">

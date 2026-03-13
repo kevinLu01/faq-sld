@@ -38,6 +38,9 @@ public class WeComOAuthService {
     private static final String STATE_KEY_PREFIX = "wecom:oauth:state:";
     private static final long STATE_TTL_MINUTES = 5L;
 
+    private static final String ACCESS_TOKEN_KEY_PREFIX = "wecom:access_token:";
+    private static final long ACCESS_TOKEN_TTL_SECONDS = 7000L;
+
     private final WeComProperties weComProperties;
     private final StringRedisTemplate redisTemplate;
     private final RestTemplate restTemplate;
@@ -105,9 +108,18 @@ public class WeComOAuthService {
     }
 
     /**
-     * 调用企业微信接口获取 access_token
+     * 获取企业微信 access_token，优先从 Redis 缓存读取（TTL 7000秒）。
+     * <p>
+     * 企业微信 access_token 有效期 7200 秒，全局唯一；频繁刷新会导致旧 token 立即失效，
+     * 多实例部署时会互相刷掉彼此的 token，因此必须缓存复用。
      */
     private String getAccessToken() {
+        String cacheKey = ACCESS_TOKEN_KEY_PREFIX + weComProperties.getCorpId();
+        String cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
         String url = UriComponentsBuilder.fromHttpUrl(WECOM_GET_TOKEN_URL)
                 .queryParam("corpid", weComProperties.getCorpId())
                 .queryParam("corpsecret", weComProperties.getCorpSecret())
@@ -121,7 +133,10 @@ public class WeComOAuthService {
                         response != null ? response.getErrcode() : -1, errMsg);
                 throw new BusinessException("获取企业微信 access_token 失败: " + errMsg);
             }
-            return response.getAccessToken();
+            String accessToken = response.getAccessToken();
+            // 缓存到 Redis，TTL 保守取 7000 秒（官方 7200 秒，预留 200 秒冗余）
+            redisTemplate.opsForValue().set(cacheKey, accessToken, ACCESS_TOKEN_TTL_SECONDS, TimeUnit.SECONDS);
+            return accessToken;
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {

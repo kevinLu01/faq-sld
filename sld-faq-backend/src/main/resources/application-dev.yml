@@ -13,7 +13,9 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 # 企业微信 Mock 登录（本地无法访问真实企业微信时使用）
-# 开启后 POST /api/auth/mock-login 接口生效
+# 注意：POST /api/auth/mock-login 接口使用 @Profile("dev") 隔离，
+#       仅在 dev profile 激活时（--spring.profiles.active=dev）路由才会注册，
+#       生产环境即使误设 mock-login: true 也无法访问该接口。
 wecom:
   mock-login: true
 

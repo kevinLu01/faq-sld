@@ -17,8 +17,8 @@
           @click="router.push(`/review/detail/${item.id}`)"
         >
           <div class="card-header">
-            <van-tag v-if="item.category" type="primary" plain size="small">{{ item.category }}</van-tag>
-            <van-tag :type="getStatusTag(item.status).type" size="small" plain>
+            <van-tag v-if="item.category" type="primary" plain>{{ item.category }}</van-tag>
+            <van-tag :type="getStatusTag(item.status).type" plain>
               {{ getStatusTag(item.status).text }}
             </van-tag>
             <span class="card-file">{{ item.fileName || '' }}</span>

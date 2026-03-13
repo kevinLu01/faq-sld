@@ -213,7 +213,7 @@ async function doApprove() {
   try {
     await candidateApi.approve(id)
     showSuccessToast('已通过')
-    router.back()
+    router.push({ path: '/review/list', query: { refresh: Date.now().toString() } })
   } catch {
     // error handled by interceptor
   } finally {
@@ -235,7 +235,7 @@ async function handleRejectConfirm(action: string) {
     await candidateApi.reject(id, rejectReason.value.trim())
     showSuccessToast('已驳回')
     rejectReason.value = ''
-    router.back()
+    router.push({ path: '/review/list', query: { refresh: Date.now().toString() } })
     return true
   } catch {
     return false
@@ -261,7 +261,7 @@ async function handleEditConfirm(action: string) {
   try {
     await candidateApi.editApprove(id, editQuestion.value.trim(), editAnswer.value.trim())
     showSuccessToast('编辑并通过成功')
-    router.back()
+    router.push({ path: '/review/list', query: { refresh: Date.now().toString() } })
     return true
   } catch {
     return false

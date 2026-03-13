@@ -20,17 +20,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import CandidateListPanel from '@/components/CandidateListPanel.vue'
 
 const router = useRouter()
+const route = useRoute()
 const activeStatus = ref('PENDING')
 const refreshTrigger = ref(0)
 
 function onTabChange() {
   refreshTrigger.value++
 }
+
+watch(() => route.query.refresh, (val) => {
+  if (val) {
+    refreshTrigger.value++
+  }
+})
 </script>
 
 <style scoped>

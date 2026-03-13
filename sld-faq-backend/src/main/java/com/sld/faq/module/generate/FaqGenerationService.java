@@ -17,9 +17,12 @@ import com.sld.faq.module.parse.DocumentParseService;
 import com.sld.faq.module.parse.TextCleaner;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.time.LocalDateTime;
@@ -55,6 +58,14 @@ public class FaqGenerationService {
     private final FaqJsonParser faqJsonParser;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+
+    /**
+     * 自注入自身代理，使 saveChunks/saveCandidates 上的 @Transactional 通过 AOP 代理生效。
+     * 使用 @Lazy 避免循环依赖问题。
+     */
+    @Lazy
+    @Autowired
+    private FaqGenerationService self;
 
     /**
      * 异步生成 FAQ
@@ -113,8 +124,8 @@ public class FaqGenerationService {
             }
             updateTask(taskId, "RUNNING", 15, null);
 
-            // 7. 保存所有 KbChunk 到数据库
-            List<KbChunk> savedChunks = saveChunks(fileId, chunks, rawText, cleanText);
+            // 7. 保存所有 KbChunk 到数据库（通过代理调用确保事务生效）
+            List<KbChunk> savedChunks = self.saveChunks(fileId, chunks, rawText, cleanText);
 
             // 8. 更新 kb_file.chunkCount
             KbFile fileUpdate = new KbFile();
@@ -142,8 +153,8 @@ public class FaqGenerationService {
                     // c. 解析 JSON
                     List<FaqCandidateDto> candidates = faqJsonParser.parse(llmOutput);
 
-                    // d. 保存 FaqCandidate（状态 PENDING）
-                    saveCandidates(fileId, chunk.getId(), candidates);
+                    // d. 保存 FaqCandidate（状态 PENDING，通过代理调用确保事务生效）
+                    self.saveCandidates(fileId, chunk.getId(), candidates);
 
                 } catch (Exception e) {
                     log.warn("处理 chunk 时异常，跳过: fileId={}, chunkId={}, error={}", fileId, chunk.getId(), e.getMessage());
@@ -163,11 +174,12 @@ public class FaqGenerationService {
     }
 
     /**
-     * 保存文本块到 kb_chunk 表
+     * 保存文本块到 kb_chunk 表（独立事务，确保批量写入原子性）
      * <p>
      * rawContent 使用原始文本（截取对应位置），cleanContent 使用 chunk 清洗内容。
      */
-    private List<KbChunk> saveChunks(Long fileId, List<String> chunkTexts, String rawText, String cleanText) {
+    @Transactional(rollbackFor = Exception.class)
+    public List<KbChunk> saveChunks(Long fileId, List<String> chunkTexts, String rawText, String cleanText) {
         List<KbChunk> chunks = new java.util.ArrayList<>();
         for (int i = 0; i < chunkTexts.size(); i++) {
             String chunkContent = chunkTexts.get(i);
@@ -186,9 +198,10 @@ public class FaqGenerationService {
     }
 
     /**
-     * 保存 FAQ 候选到 faq_candidate 表
+     * 保存 FAQ 候选到 faq_candidate 表（独立事务，确保每批候选写入原子性）
      */
-    private void saveCandidates(Long fileId, Long chunkId, List<FaqCandidateDto> dtos) {
+    @Transactional(rollbackFor = Exception.class)
+    public void saveCandidates(Long fileId, Long chunkId, List<FaqCandidateDto> dtos) {
         for (FaqCandidateDto dto : dtos) {
             FaqCandidate candidate = new FaqCandidate();
             candidate.setFileId(fileId);

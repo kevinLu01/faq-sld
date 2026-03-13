@@ -13,6 +13,7 @@ import com.sld.faq.module.user.mapper.SysUserRoleMapper;
 import com.sld.faq.module.user.vo.UserVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,7 +58,15 @@ public class UserService {
         user.setAvatar(avatar);
         user.setMobile(mobile);
         user.setStatus(1);
-        sysUserMapper.insert(user);
+        try {
+            sysUserMapper.insert(user);
+        } catch (DuplicateKeyException e) {
+            // 并发场景下另一个线程已完成插入，直接返回已存在的记录
+            return sysUserMapper.selectOne(
+                    new LambdaQueryWrapper<SysUser>()
+                            .eq(SysUser::getWecomUserId, wecomUserId)
+            );
+        }
 
         // 查询 SUBMITTER 角色并绑定
         SysRole submitterRole = sysRoleMapper.selectOne(

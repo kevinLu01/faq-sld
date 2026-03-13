@@ -17,7 +17,7 @@
     <div v-else-if="error" class="error-state">
       <van-empty :description="error" image="error">
         <template #bottom>
-          <van-button type="primary" size="small" @click="fetchDetail">重新加载</van-button>
+          <van-button type="primary" @click="fetchDetail">重新加载</van-button>
         </template>
       </van-empty>
     </div>
@@ -44,7 +44,7 @@
           v-for="kw in keywordList"
           :key="kw"
           plain
-          size="small"
+         
           style="margin-right: 6px; margin-bottom: 4px"
         >
           {{ kw }}

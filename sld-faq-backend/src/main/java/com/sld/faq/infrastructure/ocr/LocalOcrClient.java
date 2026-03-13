@@ -5,12 +5,12 @@ import com.sld.faq.config.properties.OcrProperties;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -31,13 +31,14 @@ public class LocalOcrClient implements OcrClient {
     private final OcrProperties ocrProperties;
     private final RestTemplate restTemplate;
 
-    public LocalOcrClient(OcrProperties ocrProperties, RestTemplateBuilder restTemplateBuilder) {
+    public LocalOcrClient(OcrProperties ocrProperties) {
         this.ocrProperties = ocrProperties;
         OcrProperties.Local localConfig = ocrProperties.getLocal();
-        this.restTemplate = restTemplateBuilder
-                .connectTimeout(localConfig.getTimeout())
-                .readTimeout(localConfig.getTimeout())
-                .build();
+        int timeoutMs = (int) localConfig.getTimeout().toMillis();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(timeoutMs);
+        factory.setReadTimeout(timeoutMs);
+        this.restTemplate = new RestTemplate(factory);
     }
 
     /**

@@ -65,7 +65,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   if (to.path === '/login') return true
   const userStore = useUserStore()
-  if (!userStore.token) return '/login'
+  if (!userStore.token) return { path: '/login', query: { redirect: to.fullPath } }
   return true
 })
 

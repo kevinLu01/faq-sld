@@ -1,3 +1,24 @@
+<script setup lang="ts">
+import { onMounted } from 'vue'
+import { useUserStore } from '@/stores/user'
+import { authApi } from '@/api/auth'
+
+const userStore = useUserStore()
+
+onMounted(async () => {
+  // 有 token 但没有 userInfo（页面刷新场景）
+  if (userStore.token && !userStore.userInfo) {
+    try {
+      const userInfo = await authApi.getMe()
+      userStore.setUserInfo(userInfo)
+    } catch (e) {
+      // token 失效，清除并跳转登录（401 拦截器会处理跳转）
+      userStore.logout()
+    }
+  }
+})
+</script>
+
 <template>
   <router-view />
 </template>

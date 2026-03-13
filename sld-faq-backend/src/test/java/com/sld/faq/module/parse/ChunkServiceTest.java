@@ -47,12 +47,15 @@ class ChunkServiceTest {
     @Test
     @DisplayName("超过 800 字的文本应按段落切分为多个 chunk")
     void chunk_longTextSplitByParagraph() {
-        // 构建超过 800 字的多段落文本，每段约 200 字
+        // 构建超过 800 字的多段落文本，每段约 200 字（5段合计须超过 800 字才会分块）
         String paragraph = "员工在入职时需要完成以下手续：提交身份证原件及复印件一份，学历证书原件及复印件一份，" +
                 "劳动合同签署三份，保密协议签署两份，竞业限制协议视岗位要求签署。" +
-                "所有材料需在报到当日提交人力资源部统一存档，不得延误。";
-        // 确保 paragraph 够长
-        assertThat(paragraph.length()).isGreaterThan(100);
+                "所有材料需在报到当日提交人力资源部统一存档，不得延误。" +
+                "未按规定提交材料者，入职手续将予以延期办理，由此造成的损失由员工本人承担，" +
+                "人力资源部保留追究相关责任的权利，请各位新员工务必遵守规定按时完成入职手续。";
+        // 确保单段足够长（>155 字），5段合计超过 800 字可触发分块
+        assertThat(paragraph.length()).isGreaterThan(155);
+        assertThat(paragraph.length() * 5).isGreaterThan(MAX_CHUNK_SIZE);
 
         // 拼接5段，形成超过800字的文本
         StringBuilder sb = new StringBuilder();

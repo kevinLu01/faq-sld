@@ -22,6 +22,13 @@ public interface FaqCandidateMapper extends BaseMapper<FaqCandidate> {
                                   @Param("fileId") Long fileId);
 
     /**
+     * 加排他锁查询候选 FAQ（SELECT ... FOR UPDATE）
+     * 必须在事务内调用，用于防止并发审核产生重复 FAQ。
+     */
+    @Select("SELECT * FROM faq_candidate WHERE id = #{id} FOR UPDATE")
+    FaqCandidate selectForUpdate(@Param("id") Long id);
+
+    /**
      * 统计某状态的数量
      */
     @Select("SELECT COUNT(*) FROM faq_candidate WHERE status = #{status}")

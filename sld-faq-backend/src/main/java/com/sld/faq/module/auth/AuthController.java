@@ -9,6 +9,7 @@ import com.sld.faq.module.user.UserService;
 import com.sld.faq.module.user.vo.UserVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -57,11 +58,12 @@ public class AuthController {
     }
 
     /**
-     * Mock 登录（仅开发环境，在 SaTokenConfig 的 exclude 列表中）
+     * Mock 登录（仅 dev profile 下注册，生产环境该路由不存在）
      *
      * @param req Mock 登录请求
      * @return 登录响应
      */
+    @Profile("dev")
     @PostMapping("/mock-login")
     public ApiResponse<LoginResponse> mockLogin(@RequestBody MockLoginRequest req) {
         return ApiResponse.ok(authService.mockLogin(req.getUserId(), req.getName(), req.getRole()));

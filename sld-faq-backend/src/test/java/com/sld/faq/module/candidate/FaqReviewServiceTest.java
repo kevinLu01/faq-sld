@@ -70,7 +70,7 @@ class FaqReviewServiceTest {
         candidate.setFileId(10L);
         candidate.setChunkId(100L);
 
-        when(candidateMapper.selectById(1L)).thenReturn(candidate);
+        when(candidateMapper.selectForUpdate(1L)).thenReturn(candidate);
         when(faqCategoryMapper.selectList(any())).thenReturn(
                 List.of(buildCategory(5L, "差旅报销"))
         );
@@ -116,7 +116,7 @@ class FaqReviewServiceTest {
         FaqCandidate candidate = buildPendingCandidate(2L);
         candidate.setStatus("APPROVED");
 
-        when(candidateMapper.selectById(2L)).thenReturn(candidate);
+        when(candidateMapper.selectForUpdate(2L)).thenReturn(candidate);
 
         // Act & Assert
         assertThatThrownBy(() -> faqReviewService.approve(2L, 50L))
@@ -124,14 +124,13 @@ class FaqReviewServiceTest {
                 .hasMessageContaining("非 PENDING");
 
         verify(faqService, never()).createFaqItem(any());
-        verify(faqSourceRefMapper, never()).insert(any());
+        verify(faqSourceRefMapper, never()).insert(any(FaqSourceRef.class));
     }
 
     @Test
     @DisplayName("candidate 不存在时应抛出 BusinessException")
     void approve_notExistingCandidate_throwsBusinessException() {
-        when(candidateMapper.selectById(999L)).thenReturn(null);
-
+        // selectForUpdate returns null by default (mock), no stubbing needed
         assertThatThrownBy(() -> faqReviewService.approve(999L, 50L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("候选 FAQ 不存在");
@@ -147,7 +146,7 @@ class FaqReviewServiceTest {
         candidate.setQuestion("这是一个描述不准确的问题？");
         candidate.setAnswer("这是一个不完整的回答。");
 
-        when(candidateMapper.selectById(3L)).thenReturn(candidate);
+        when(candidateMapper.selectForUpdate(3L)).thenReturn(candidate);
         when(candidateMapper.updateById(any(FaqCandidate.class))).thenReturn(1);
 
         String rejectReason = "问题描述不够准确，与原文内容出入较大，建议重新生成";
@@ -174,7 +173,7 @@ class FaqReviewServiceTest {
         FaqCandidate candidate = buildPendingCandidate(4L);
         candidate.setStatus("REJECTED");
 
-        when(candidateMapper.selectById(4L)).thenReturn(candidate);
+        when(candidateMapper.selectForUpdate(4L)).thenReturn(candidate);
 
         assertThatThrownBy(() -> faqReviewService.reject(4L, 50L, "重复驳回"))
                 .isInstanceOf(BusinessException.class)
@@ -194,13 +193,13 @@ class FaqReviewServiceTest {
         candidate.setFileId(20L);
         candidate.setChunkId(200L);
 
-        when(candidateMapper.selectById(5L)).thenReturn(candidate);
+        when(candidateMapper.selectForUpdate(5L)).thenReturn(candidate);
         when(faqCategoryMapper.selectList(any())).thenReturn(
                 List.of(buildCategory(6L, "政策法规"))
         );
         when(faqService.createFaqItem(any(FaqItem.class))).thenReturn(999L);
-        when(faqSourceRefMapper.insert(any())).thenReturn(1);
-        when(candidateMapper.updateById(any())).thenReturn(1);
+        when(faqSourceRefMapper.insert(any(FaqSourceRef.class))).thenReturn(1);
+        when(candidateMapper.updateById(any(FaqCandidate.class))).thenReturn(1);
 
         String correctedQuestion = "员工申请年假需要提前几个工作日？";
         String correctedAnswer = "根据公司政策，员工申请年假需提前三个工作日在 HR 系统中提交，审批后方可休假。";
@@ -231,11 +230,11 @@ class FaqReviewServiceTest {
         candidate.setFileId(30L);
         candidate.setChunkId(300L);
 
-        when(candidateMapper.selectById(6L)).thenReturn(candidate);
+        when(candidateMapper.selectForUpdate(6L)).thenReturn(candidate);
         when(faqCategoryMapper.selectList(any())).thenReturn(List.of());
         when(faqService.createFaqItem(any(FaqItem.class))).thenReturn(1001L);
-        when(faqSourceRefMapper.insert(any())).thenReturn(1);
-        when(candidateMapper.updateById(any())).thenReturn(1);
+        when(faqSourceRefMapper.insert(any(FaqSourceRef.class))).thenReturn(1);
+        when(candidateMapper.updateById(any(FaqCandidate.class))).thenReturn(1);
 
         // Act: 传入 null question 和空 answer
         faqReviewService.editApprove(6L, 50L, null, "");
@@ -265,7 +264,7 @@ class FaqReviewServiceTest {
         targetFaq.setAnswer("在 HR 系统中提交申请，经主管审批后生效。");
         targetFaq.setStatus(1); // 已发布
 
-        when(candidateMapper.selectById(7L)).thenReturn(candidate);
+        when(candidateMapper.selectForUpdate(7L)).thenReturn(candidate);
         when(faqItemMapper.selectById(555L)).thenReturn(targetFaq);
         when(faqSourceRefMapper.insert(any(FaqSourceRef.class))).thenReturn(1);
         when(candidateMapper.updateById(any(FaqCandidate.class))).thenReturn(1);
@@ -294,7 +293,7 @@ class FaqReviewServiceTest {
     @DisplayName("合并时目标 FAQ 不存在应抛出 BusinessException")
     void merge_targetFaqNotExist_throwsBusinessException() {
         FaqCandidate candidate = buildPendingCandidate(8L);
-        when(candidateMapper.selectById(8L)).thenReturn(candidate);
+        when(candidateMapper.selectForUpdate(8L)).thenReturn(candidate);
         when(faqItemMapper.selectById(9999L)).thenReturn(null);
 
         assertThatThrownBy(() -> faqReviewService.merge(8L, 50L, 9999L))
@@ -310,7 +309,7 @@ class FaqReviewServiceTest {
         unpublishedFaq.setId(666L);
         unpublishedFaq.setStatus(0); // 已下线
 
-        when(candidateMapper.selectById(9L)).thenReturn(candidate);
+        when(candidateMapper.selectForUpdate(9L)).thenReturn(candidate);
         when(faqItemMapper.selectById(666L)).thenReturn(unpublishedFaq);
 
         assertThatThrownBy(() -> faqReviewService.merge(9L, 50L, 666L))

@@ -23,7 +23,6 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class FaqReviewService {
 
     private final FaqCandidateMapper candidateMapper;
@@ -34,13 +33,14 @@ public class FaqReviewService {
 
     /**
      * 通过审核：
-     * 1. 检查 candidate.status == PENDING
+     * 1. 检查 candidate.status == PENDING（加悲观锁防并发）
      * 2. 创建 faq_item
      * 3. 创建 faq_source_ref
      * 4. 更新 candidate.status = APPROVED
      *
      * @return 新创建的 faqId
      */
+    @Transactional(rollbackFor = Exception.class)
     public Long approve(Long candidateId, Long reviewerId) {
         FaqCandidate candidate = getAndCheckPending(candidateId);
         Long faqId = createFaqItemFromCandidate(candidate, reviewerId);
@@ -54,6 +54,7 @@ public class FaqReviewService {
      * 1. 检查 candidate.status == PENDING
      * 2. 更新 candidate.status = REJECTED，记录驳回原因
      */
+    @Transactional(rollbackFor = Exception.class)
     public void reject(Long candidateId, Long reviewerId, String reason) {
         FaqCandidate candidate = getAndCheckPending(candidateId);
         candidate.setStatus("REJECTED");
@@ -71,6 +72,7 @@ public class FaqReviewService {
      *
      * @return 新创建的 faqId
      */
+    @Transactional(rollbackFor = Exception.class)
     public Long editApprove(Long candidateId, Long reviewerId, String question, String answer) {
         FaqCandidate candidate = getAndCheckPending(candidateId);
         if (question != null && !question.isBlank()) {
@@ -92,6 +94,7 @@ public class FaqReviewService {
      * 3. 创建 faq_source_ref（关联到 targetFaqId）
      * 4. 更新 candidate.status = MERGED
      */
+    @Transactional(rollbackFor = Exception.class)
     public void merge(Long candidateId, Long reviewerId, Long targetFaqId) {
         FaqCandidate candidate = getAndCheckPending(candidateId);
 
@@ -118,9 +121,10 @@ public class FaqReviewService {
 
     /**
      * 获取候选 FAQ 并校验状态为 PENDING，否则抛 BusinessException
+     * 使用 SELECT ... FOR UPDATE 加排他锁，防止并发审核产生重复 FAQ。
      */
     private FaqCandidate getAndCheckPending(Long candidateId) {
-        FaqCandidate candidate = candidateMapper.selectById(candidateId);
+        FaqCandidate candidate = candidateMapper.selectForUpdate(candidateId);
         if (candidate == null) {
             throw new BusinessException("候选 FAQ 不存在，id=" + candidateId);
         }

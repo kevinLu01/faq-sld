@@ -131,9 +131,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast, showConfirmDialog } from 'vant'
+import { showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { fileApi } from '@/api/file'
 import type { FileVO } from '@/types'
@@ -157,13 +157,13 @@ const taskFailed = ref(false)
 const taskErrorMsg = ref('')
 const taskStatusText = ref('正在处理...')
 
-const ALLOWED_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain', 'text/csv',
-  'application/msword', 'application/vnd.ms-excel']
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
 const ALLOWED_EXTS = ['.pdf', '.docx', '.xlsx', '.txt', '.csv', '.doc', '.xls']
 
-function beforeRead(file: File) {
-  const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+function beforeRead(file: File | File[]): boolean {
+  const f = Array.isArray(file) ? file[0] : file
+  const ext = '.' + f.name.split('.').pop()?.toLowerCase()
   if (!ALLOWED_EXTS.includes(ext)) {
     showToast('不支持该文件类型，请上传 PDF / DOCX / XLSX / TXT / CSV')
     return false
@@ -264,7 +264,8 @@ async function generateFaq() {
 }
 
 function pollTaskStatus(id: number) {
-  const timer = setInterval(async () => {
+  if (pollTimer) clearInterval(pollTimer)
+  pollTimer = setInterval(async () => {
     try {
       const status = await fileApi.getTaskStatus(id)
       taskProgress.value = status.progress
@@ -272,14 +273,16 @@ function pollTaskStatus(id: number) {
       if (status.status === 'RUNNING') {
         taskStatusText.value = `正在处理... ${status.progress}%`
       } else if (status.status === 'SUCCESS') {
-        clearInterval(timer)
+        clearInterval(pollTimer!)
+        pollTimer = null
         taskFinished.value = true
         showToast({ message: 'FAQ 生成完成！', type: 'success' })
         setTimeout(() => {
           router.push('/review/list')
         }, 1500)
       } else if (status.status === 'FAILED') {
-        clearInterval(timer)
+        clearInterval(pollTimer!)
+        pollTimer = null
         taskFailed.value = true
         taskErrorMsg.value = status.errorMsg || 'FAQ 生成失败'
         showToast('FAQ 生成失败')
@@ -289,6 +292,13 @@ function pollTaskStatus(id: number) {
     }
   }, 3000)
 }
+
+onUnmounted(() => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+})
 </script>
 
 <style scoped>

@@ -71,7 +71,7 @@
           @click="router.push(`/review/detail/${item.id}`)"
         >
           <div class="recent-header">
-            <van-tag v-if="item.category" type="primary" plain size="small">{{ item.category }}</van-tag>
+            <van-tag v-if="item.category" type="primary" plain>{{ item.category }}</van-tag>
             <span class="recent-file">{{ item.fileName || '未知文件' }}</span>
           </div>
           <p class="recent-question">{{ item.question }}</p>

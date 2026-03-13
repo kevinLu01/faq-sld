@@ -19,6 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.apache.tika.Tika;
+
+import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +37,16 @@ public class FileService {
 
     private static final long MAX_FILE_SIZE = 50L * 1024 * 1024; // 50MB
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "docx", "xlsx", "txt", "csv");
+    private static final Set<String> ALLOWED_MIME_TYPES = Set.of(
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            // Tika returns this generic type for OOXML when exact subtype can't be determined
+            "application/x-tika-ooxml",
+            "text/plain",
+            "text/csv",
+            "application/csv"
+    );
     private static final DateTimeFormatter DT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final KbFileMapper kbFileMapper;
@@ -60,6 +73,8 @@ public class FileService {
         if (!ALLOWED_EXTENSIONS.contains(ext)) {
             throw new BusinessException("不支持的文件类型，允许：pdf, docx, xlsx, txt, csv");
         }
+        // 校验文件真实类型（Magic Number），防止后缀伪造
+        validateMimeType(file);
 
         // 上传到 MinIO
         String minioPath;
@@ -193,5 +208,24 @@ public class FileService {
             return "";
         }
         return filename.substring(dot + 1);
+    }
+
+    /**
+     * 使用 Apache Tika 检测文件真实 MIME 类型（Magic Number 校验），
+     * 防止攻击者将非法文件伪装成合法后缀进行上传。
+     */
+    private void validateMimeType(MultipartFile file) {
+        try {
+            Tika tika = new Tika();
+            String detectedType = tika.detect(file.getBytes());
+            if (!ALLOWED_MIME_TYPES.contains(detectedType)) {
+                throw new BusinessException("文件内容与扩展名不匹配，请上传真实的文档文件（检测到: " + detectedType + "）");
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (IOException e) {
+            log.error("读取文件内容失败（MIME 校验）: name={}", file.getOriginalFilename(), e);
+            throw new BusinessException("文件读取失败，请重新上传");
+        }
     }
 }

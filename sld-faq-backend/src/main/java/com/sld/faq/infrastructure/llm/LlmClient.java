@@ -6,10 +6,10 @@ import com.sld.faq.infrastructure.llm.dto.LlmMessage;
 import com.sld.faq.infrastructure.llm.dto.LlmRequest;
 import com.sld.faq.infrastructure.llm.dto.LlmResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -28,12 +28,13 @@ public class LlmClient {
     private final LlmProperties llmProperties;
     private final RestTemplate restTemplate;
 
-    public LlmClient(LlmProperties llmProperties, RestTemplateBuilder restTemplateBuilder) {
+    public LlmClient(LlmProperties llmProperties) {
         this.llmProperties = llmProperties;
-        this.restTemplate = restTemplateBuilder
-                .connectTimeout(llmProperties.getTimeout())
-                .readTimeout(llmProperties.getTimeout())
-                .build();
+        int timeoutMs = (int) llmProperties.getTimeout().toMillis();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(timeoutMs);
+        factory.setReadTimeout(timeoutMs);
+        this.restTemplate = new RestTemplate(factory);
     }
 
     /**

@@ -20,8 +20,8 @@ public class TextCleaner {
     /** 匹配超过两个连续换行 */
     private static final Pattern EXCESSIVE_NEWLINES = Pattern.compile("\\n{3,}");
 
-    /** 匹配段内孤立换行（单个 \n，下一行不以标点、空白、特殊符号开头） */
-    private static final Pattern INLINE_BREAK = Pattern.compile("\\n(?![\\s\\p{P}\\[（【])");
+    /** 匹配段内孤立换行（单个 \n，且前后都不是 \n，下一行不以标点、空白、特殊符号开头） */
+    private static final Pattern INLINE_BREAK = Pattern.compile("(?<!\\n)\\n(?![\\n\\s\\p{P}\\[（【])");
 
     /**
      * 清洗规则：

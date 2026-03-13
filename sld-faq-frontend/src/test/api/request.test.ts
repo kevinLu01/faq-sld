@@ -33,8 +33,11 @@ vi.mock('vant', () => ({
   showToast: vi.fn(),
 }))
 
+// vi.mock() is hoisted to the top of the file by Vitest, so any variables
+// referenced inside the factory must also be hoisted via vi.hoisted().
+const mockRouterPush = vi.hoisted(() => vi.fn())
+
 // Mock vue-router so router.push is a spy
-const mockRouterPush = vi.fn()
 vi.mock('@/router', () => ({
   default: { push: mockRouterPush },
 }))
