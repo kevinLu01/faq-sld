@@ -7,7 +7,7 @@
         <where>
             <if test="status != null and status != ''">
                 <choose>
-                    <when test="status.contains(',')">
+                    <when test='status.contains(",")'>
                         AND status IN
                         <foreach item="s" collection="status.split(',')" open="(" separator="," close=")">
                             #{s}
