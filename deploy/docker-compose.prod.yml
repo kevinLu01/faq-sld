@@ -1,0 +1,107 @@
+version: '3.8'
+
+# SLD FAQ 生产环境 — 新加坡服务器
+#
+# 仅包含后端 + 基础设施，不含 GPU 服务（vLLM/OCR 在本地机器通过 tailscale 访问）
+# 前端由 1Panel openresty 直接服务静态文件
+#
+# 部署：
+#   cd /opt/sld-faq && docker compose -f deploy/docker-compose.prod.yml up -d
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: sld-faq-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-sld_faq}
+      POSTGRES_USER: ${DB_USER:-sld}
+      POSTGRES_PASSWORD: ${DB_PASS}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../docs/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sld -d sld_faq"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: sld-faq-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASS}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASS}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: sld-faq-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    build:
+      context: ../sld-faq-backend
+      dockerfile: Dockerfile
+    container_name: sld-faq-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18081:8080"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-sld_faq}
+      DB_USER: ${DB_USER:-sld}
+      DB_PASS: ${DB_PASS}
+      REDIS_HOST: redis
+      REDIS_PASS: ${REDIS_PASS}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      # LLM — 通过 tailscale 直连本地 vLLM
+      LLM_BASE_URL: ${LLM_BASE_URL}
+      LLM_API_KEY: ${LLM_API_KEY:-EMPTY}
+      LLM_MODEL_NAME: ${LLM_MODEL_NAME:-qwen2.5:14b}
+      # OCR — 通过 tailscale 直连本地 OCR 服务
+      OCR_BASE_URL: ${OCR_BASE_URL}
+      # 企业微信 OAuth
+      WECOM_CORP_ID: ${WECOM_CORP_ID}
+      WECOM_CORP_SECRET: ${WECOM_CORP_SECRET}
+      WECOM_AGENT_ID: ${WECOM_AGENT_ID}
+      WECOM_REDIRECT_URI: ${WECOM_REDIRECT_URI}
+      WECOM_MOCK_LOGIN: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

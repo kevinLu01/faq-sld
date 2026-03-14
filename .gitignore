@@ -1,5 +1,7 @@
 # Environment
 .env
+deploy/.env
+.playwright-mcp/
 
 # Backend
 sld-faq-backend/target/
