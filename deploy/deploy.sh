@@ -18,21 +18,17 @@ if [ ! -f deploy/.env ]; then
     exit 1
 fi
 
-echo "=== 3. 构建前端 ==="
-cd sld-faq-frontend
-# 检查 node 是否可用
-if ! command -v node &> /dev/null; then
-    echo "安装 Node.js..."
-    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-    sudo apt-get install -y nodejs
-fi
-npm install --registry=https://registry.npmmirror.com
-npm run build
+echo "=== 3. 构建前端（Docker 内 build）==="
+docker run --rm \
+  -v "$REPO_DIR/sld-faq-frontend:/app" \
+  -w /app \
+  node:22-alpine \
+  sh -c "npm install --registry=https://registry.npmmirror.com && npm run build:prod"
 
 echo "=== 4. 部署前端静态文件 ==="
 # 保留 WW_verify 文件，清除旧的前端文件
 sudo find "$SITE_DIR" -maxdepth 1 ! -name 'WW_verify_*' ! -name '.' -exec rm -rf {} + 2>/dev/null || true
-sudo cp -r dist/* "$SITE_DIR/"
+sudo cp -r "$REPO_DIR/sld-faq-frontend/dist/"* "$SITE_DIR/"
 echo "前端文件已部署到 $SITE_DIR"
 
 echo "=== 5. 构建并启动后端服务 ==="
