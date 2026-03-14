@@ -65,8 +65,8 @@ public class FaqService {
             throw new BusinessException("FAQ 不存在，id=" + id);
         }
 
-        // viewCount +1
-        faqItemMapper.updateById(buildViewCountUpdate(id, item.getViewCount()));
+        // viewCount +1 (atomic SQL update)
+        faqItemMapper.incrementViewCount(id);
 
         return toVO(item, true);
     }
@@ -141,13 +141,4 @@ public class FaqService {
         return vo;
     }
 
-    /**
-     * 构造仅更新 view_count 的 FaqItem 对象（避免触发 updatedAt 之外字段的更新）
-     */
-    private FaqItem buildViewCountUpdate(Long id, Integer currentViewCount) {
-        FaqItem update = new FaqItem();
-        update.setId(id);
-        update.setViewCount(currentViewCount == null ? 1 : currentViewCount + 1);
-        return update;
-    }
 }

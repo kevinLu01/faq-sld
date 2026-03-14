@@ -21,6 +21,11 @@ import org.springframework.web.client.RestTemplate;
  * <p>
  * 通过 HTTP multipart/form-data POST 调用本地 FastAPI OCR 服务。
  * 仅在 {@code ocr.enabled=true} 时激活，作为默认主要实现（@Primary）。
+ * <p>
+ * <b>Provider 扩展说明：</b>当前仅实现 {@code local} provider（本地 GOT-OCR 2.0）。
+ * 若未来需要接入百度/腾讯等云端 OCR，可新增对应实现类（如 BaiduOcrClient、TencentOcrClient），
+ * 通过 {@code ocr.provider} 配置项 + {@code @ConditionalOnProperty} 控制激活哪个实现，
+ * 上层代码（PdfParser 等）只依赖 {@link OcrClient} 接口，无需改动。
  */
 @Slf4j
 @Primary
@@ -78,6 +83,13 @@ public class LocalOcrClient implements OcrClient {
                 return OcrResult.failure("OCR 服务返回空响应");
             }
 
+            // 检查 OCR 服务返回的业务状态
+            if (response.getSuccess() != null && !response.getSuccess()) {
+                String errorMsg = response.getErrorMsg() != null ? response.getErrorMsg() : "OCR 服务返回失败（无错误信息）";
+                log.warn("OCR 服务返回失败: filename={}, errorMsg={}", filename, errorMsg);
+                return OcrResult.failure(errorMsg);
+            }
+
             log.debug("OCR 识别完成: filename={}, textLength={}", filename,
                     response.getText() != null ? response.getText().length() : 0);
             return OcrResult.success(
@@ -96,10 +108,14 @@ public class LocalOcrClient implements OcrClient {
      */
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class OcrServiceResponse {
+    static class OcrServiceResponse {
         /** 识别出的纯文本 */
         private String text;
         /** 带表格结构的 Markdown */
         private String markdown;
+        /** 业务处理是否成功 */
+        private Boolean success;
+        /** 失败时的错误信息 */
+        private String errorMsg;
     }
 }

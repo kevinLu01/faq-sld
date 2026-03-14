@@ -1,5 +1,7 @@
 package com.sld.faq.module.file;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
 import cn.dev33.satoken.stp.StpUtil;
 import com.sld.faq.common.ApiResponse;
 import com.sld.faq.common.PageResult;
@@ -25,6 +27,7 @@ public class FileController {
      * 上传文件，当前用户作为提交人
      */
     @PostMapping("/upload")
+    @SaCheckRole(value = {"SUBMITTER", "ADMIN"}, mode = SaMode.OR)
     public ApiResponse<FileVO> upload(@RequestParam("file") MultipartFile file) {
         Long submitterId = StpUtil.getLoginIdAsLong();
         FileVO vo = fileService.upload(file, submitterId);
@@ -59,6 +62,7 @@ public class FileController {
      * 触发 FAQ 生成，返回 taskId
      */
     @PostMapping("/{id}/generate-faq")
+    @SaCheckRole(value = {"SUBMITTER", "ADMIN"}, mode = SaMode.OR)
     public ApiResponse<Map<String, Long>> generateFaq(@PathVariable Long id) {
         Long taskId = fileService.triggerGenerateFaq(id);
         return ApiResponse.ok(Map.of("taskId", taskId));

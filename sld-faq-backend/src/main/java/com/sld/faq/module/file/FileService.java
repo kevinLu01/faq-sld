@@ -13,6 +13,7 @@ import com.sld.faq.module.file.mapper.KbTaskMapper;
 import com.sld.faq.module.file.vo.FileVO;
 import com.sld.faq.module.file.vo.TaskStatusVO;
 import com.sld.faq.module.generate.FaqGenerationService;
+import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,6 +49,7 @@ public class FileService {
             "application/csv"
     );
     private static final DateTimeFormatter DT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final Tika TIKA = new Tika();
 
     private final KbFileMapper kbFileMapper;
     private final KbTaskMapper kbTaskMapper;
@@ -65,7 +67,7 @@ public class FileService {
         }
 
         // 校验文件类型
-        String originalName = file.getOriginalFilename();
+        String originalName = sanitizeFilename(file.getOriginalFilename());
         if (originalName == null || originalName.isBlank()) {
             throw new BusinessException("文件名不能为空");
         }
@@ -134,6 +136,7 @@ public class FileService {
         if (kbFile == null) {
             throw new BusinessException(40004, "文件不存在");
         }
+        checkFileOwnership(kbFile);
         KbTask latestTask = kbTaskMapper.selectLatestByFileId(id);
         return toFileVO(kbFile, latestTask);
     }
@@ -147,6 +150,7 @@ public class FileService {
         if (kbFile == null) {
             throw new BusinessException(40004, "文件不存在");
         }
+        checkFileOwnership(kbFile);
 
         // 创建任务记录
         KbTask task = new KbTask();
@@ -202,6 +206,31 @@ public class FileService {
         return vo;
     }
 
+    /**
+     * 校验当前用户是否为文件的提交者或拥有 ADMIN/REVIEWER 角色，防止 IDOR
+     */
+    private void checkFileOwnership(KbFile kbFile) {
+        long currentUserId = StpUtil.getLoginIdAsLong();
+        if (kbFile.getSubmitterId() != null && kbFile.getSubmitterId().equals(currentUserId)) {
+            return;
+        }
+        if (StpUtil.hasRole("ADMIN") || StpUtil.hasRole("REVIEWER")) {
+            return;
+        }
+        throw new BusinessException(403, "无权访问该文件");
+    }
+
+    private String sanitizeFilename(String name) {
+        if (name == null || name.isBlank()) return null;
+        // Take only the last path segment (strip directory traversal)
+        name = name.replaceAll(".*[/\\\\]", "");
+        // Remove null bytes and other control characters
+        name = name.replaceAll("[\\x00]", "");
+        // Remove ".." sequences
+        name = name.replace("..", "");
+        return name.isBlank() ? null : name;
+    }
+
     private String extractExtension(String filename) {
         int dot = filename.lastIndexOf('.');
         if (dot < 0 || dot == filename.length() - 1) {
@@ -216,8 +245,7 @@ public class FileService {
      */
     private void validateMimeType(MultipartFile file) {
         try {
-            Tika tika = new Tika();
-            String detectedType = tika.detect(file.getBytes());
+            String detectedType = TIKA.detect(file.getInputStream(), file.getOriginalFilename());
             if (!ALLOWED_MIME_TYPES.contains(detectedType)) {
                 throw new BusinessException("文件内容与扩展名不匹配，请上传真实的文档文件（检测到: " + detectedType + "）");
             }

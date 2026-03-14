@@ -14,7 +14,7 @@ public class PromptBuilder {
             "你是一个专业的知识库整理助手，服务于制造业（空调配件）企业。\n" +
             "以下是从企业内部文档中提取的文本片段：\n\n" +
             "---\n" +
-            "%s\n" +
+            "{CONTENT}\n" +
             "---\n\n" +
             "请基于以上内容提取 0~3 条有价值的 FAQ。\n\n" +
             "要求：\n" +
@@ -31,7 +31,7 @@ public class PromptBuilder {
             "你是一个专业的知识库整理助手，服务于制造业（空调配件）企业。\n" +
             "以下是企业内部工作群的聊天记录片段：\n\n" +
             "---\n" +
-            "%s\n" +
+            "{CONTENT}\n" +
             "---\n\n" +
             "请从对话中识别有价值的问答对，整理为 0~3 条 FAQ。\n\n" +
             "要求：\n" +
@@ -54,6 +54,6 @@ public class PromptBuilder {
             case DOCUMENT -> DOCUMENT_TEMPLATE;
             case CONVERSATION -> CONVERSATION_TEMPLATE;
         };
-        return String.format(template, chunkContent);
+        return template.replace("{CONTENT}", chunkContent);
     }
 }

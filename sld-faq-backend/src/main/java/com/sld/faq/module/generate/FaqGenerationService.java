@@ -293,15 +293,15 @@ public class FaqGenerationService {
         if (text == null || text.isEmpty()) {
             return 0;
         }
-        int count = 0;
+        int cjkCount = 0;
+        int asciiCount = 0;
         for (char c : text.toCharArray()) {
             if (c > 0x7F) {
-                count++;
+                cjkCount++;
             } else {
-                count += 1;
+                asciiCount++;
             }
         }
-        // 英文部分按平均 4 字符/token 简化
-        return count;
+        return cjkCount + Math.max(1, asciiCount / 4);
     }
 }

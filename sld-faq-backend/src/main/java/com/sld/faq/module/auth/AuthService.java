@@ -8,6 +8,7 @@ import com.sld.faq.module.auth.dto.LoginResponse;
 import com.sld.faq.module.user.UserService;
 import com.sld.faq.module.user.entity.SysUser;
 import com.sld.faq.module.user.vo.UserVO;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,13 @@ public class AuthService {
     private final WeComOAuthService weComOAuthService;
     private final WeComProperties weComProperties;
     private final UserService userService;
+
+    @PostConstruct
+    void warnIfMockLoginEnabled() {
+        if (weComProperties.isMockLogin()) {
+            log.warn("Mock login is enabled! Do NOT use in production. Set WECOM_MOCK_LOGIN=false for production deployments.");
+        }
+    }
 
     /**
      * 生成企业微信 OAuth 授权跳转 URL
@@ -87,6 +95,8 @@ public class AuthService {
         if (!weComProperties.isMockLogin()) {
             throw new BusinessException(403, "mock登录已禁用");
         }
+
+        log.warn("Mock login invoked: wecomUserId={}, role={}. Do NOT use in production.", wecomUserId, role);
 
         // 使用默认角色 SUBMITTER 创建或查找用户
         SysUser user = userService.findOrCreate(wecomUserId, name, null, null);

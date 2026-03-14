@@ -5,7 +5,19 @@
     <select id="selectPage" resultType="com.sld.faq.module.candidate.entity.FaqCandidate">
         SELECT * FROM faq_candidate
         <where>
-            <if test="status != null and status != ''">AND status = #{status}</if>
+            <if test="status != null and status != ''">
+                <choose>
+                    <when test="status.contains(',')">
+                        AND status IN
+                        <foreach item="s" collection="status.split(',')" open="(" separator="," close=")">
+                            #{s}
+                        </foreach>
+                    </when>
+                    <otherwise>
+                        AND status = #{status}
+                    </otherwise>
+                </choose>
+            </if>
             <if test="fileId != null">AND file_id = #{fileId}</if>
         </where>
         ORDER BY created_at DESC

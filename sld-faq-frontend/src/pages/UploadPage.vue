@@ -159,7 +159,7 @@ const taskStatusText = ref('正在处理...')
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
-const ALLOWED_EXTS = ['.pdf', '.docx', '.xlsx', '.txt', '.csv', '.doc', '.xls']
+const ALLOWED_EXTS = ['.pdf', '.docx', '.xlsx', '.txt', '.csv']
 
 function beforeRead(file: File | File[]): boolean {
   const f = Array.isArray(file) ? file[0] : file

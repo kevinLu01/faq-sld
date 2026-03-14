@@ -57,7 +57,7 @@ const total = ref(0)
 const PAGE_SIZE = 20
 
 function getQueryStatus(): string {
-  if (props.status === 'REVIEWED') return 'APPROVED'
+  if (props.status === 'REVIEWED') return 'APPROVED,REJECTED,MERGED'
   return props.status
 }
 

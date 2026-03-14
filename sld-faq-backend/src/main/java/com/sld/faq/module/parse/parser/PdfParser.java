@@ -72,10 +72,18 @@ public class PdfParser {
             String filename = "page_" + (i + 1) + ".png";
 
             OcrResult result = ocrClient.ocr(imageBytes, filename);
-            if (result.isSuccess() && result.getText() != null && !result.getText().isBlank()) {
-                sb.append(result.getText()).append("\n\n");
+            if (result.isSuccess()) {
+                // 优先使用 markdown（保留表格结构），fallback 到纯文本
+                String content = (result.getMarkdown() != null && !result.getMarkdown().isBlank())
+                        ? result.getMarkdown()
+                        : result.getText();
+                if (content != null && !content.isBlank()) {
+                    sb.append(content).append("\n\n");
+                } else {
+                    log.warn("第 {} 页 OCR 成功但无有效内容", i + 1);
+                }
             } else {
-                log.warn("第 {} 页 OCR 失败或无结果: {}", i + 1, result.getErrorMsg());
+                log.warn("第 {} 页 OCR 失败: {}", i + 1, result.getErrorMsg());
             }
         }
 

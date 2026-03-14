@@ -5,7 +5,7 @@ OCR 引擎封装模块
 """
 
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModel
 import os
 
 # 模型路径：优先从环境变量读取，默认使用 HuggingFace Hub 上的模型 ID
@@ -32,7 +32,7 @@ class OcrEngine:
             MODEL_PATH,
             trust_remote_code=True
         )
-        self.model = AutoModelForCausalLM.from_pretrained(
+        self.model = AutoModel.from_pretrained(
             MODEL_PATH,
             # GPU 使用 bfloat16 节省显存；CPU 使用 float32 保证精度
             torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,

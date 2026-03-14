@@ -31,7 +31,7 @@
           </div>
           <div class="stat-card">
             <p class="stat-value success-color">{{ todayHandled }}</p>
-            <p class="stat-label">今日处理</p>
+            <p class="stat-label">总已审核</p>
           </div>
         </div>
       </div>
@@ -129,8 +129,12 @@ const quickEntries = [
 async function loadStats() {
   statsLoading.value = true
   try {
-    const res = await candidateApi.list({ status: 'PENDING', page: 0, size: 1 })
-    pendingCount.value = res.total
+    const [pendingRes, reviewedRes] = await Promise.all([
+      candidateApi.list({ status: 'PENDING', page: 0, size: 1 }),
+      candidateApi.list({ status: 'APPROVED,REJECTED,MERGED', page: 0, size: 1 }),
+    ])
+    pendingCount.value = pendingRes.total
+    todayHandled.value = reviewedRes.total
   } catch {
     // ignore
   } finally {

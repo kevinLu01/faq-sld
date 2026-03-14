@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sld.faq.module.faq.entity.FaqItem;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * faq_item 表 Mapper
@@ -19,4 +20,10 @@ public interface FaqItemMapper extends BaseMapper<FaqItem> {
     Page<FaqItem> searchPage(Page<FaqItem> page,
                              @Param("keyword") String keyword,
                              @Param("categoryId") Long categoryId);
+
+    /**
+     * SQL 原子更新 view_count，避免并发下的 read-then-update 问题
+     */
+    @Update("UPDATE faq_item SET view_count = view_count + 1 WHERE id = #{id}")
+    void incrementViewCount(@Param("id") Long id);
 }

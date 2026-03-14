@@ -3,6 +3,7 @@ package com.sld.faq.module.auth;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sld.faq.common.BusinessException;
 import com.sld.faq.common.GlobalExceptionHandler;
+import com.sld.faq.config.properties.WeComProperties;
 import com.sld.faq.module.auth.dto.LoginResponse;
 import com.sld.faq.module.auth.dto.MockLoginRequest;
 import com.sld.faq.module.auth.dto.WeComCallbackRequest;
@@ -52,6 +53,9 @@ class AuthControllerTest {
 
     @MockBean
     private UserService userService;
+
+    @MockBean
+    private WeComProperties weComProperties;
 
     // ========== GET /api/auth/wecom/url ==========
 

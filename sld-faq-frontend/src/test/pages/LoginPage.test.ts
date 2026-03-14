@@ -18,6 +18,7 @@ vi.mock('vue-router', () => ({
 
 vi.mock('@/api/auth', () => ({
   authApi: {
+    getConfig: vi.fn(),
     getWecomUrl: vi.fn(),
     callback: vi.fn(),
     mockLogin: vi.fn(),
@@ -79,13 +80,14 @@ describe('LoginPage', () => {
       delete mockRouteQuery[key]
     }
 
-    // Default: DEV mode so we see mock login buttons
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(import.meta as any).env = { DEV: true }
+    // Default: mock getConfig to return mockLoginEnabled: false
+    ;(authApi.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ mockLoginEnabled: false })
   })
 
   it('showsMockLoginButtons_inDevEnvironment', async () => {
-    // DEV = true is set in beforeEach
+    // Mock getConfig to return mockLoginEnabled: true
+    ;(authApi.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ mockLoginEnabled: true })
+
     const wrapper = mountLoginPage()
     await flushPromises()
 
@@ -98,6 +100,7 @@ describe('LoginPage', () => {
   })
 
   it('handlesMockLogin_setsTokenAndRedirects', async () => {
+    ;(authApi.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ mockLoginEnabled: true })
     ;(authApi.mockLogin as ReturnType<typeof vi.fn>).mockResolvedValue(mockLoginResponse)
 
     const wrapper = mountLoginPage()
@@ -118,10 +121,6 @@ describe('LoginPage', () => {
   })
 
   it('showsLoadingState_duringOAuthCallback', async () => {
-    // Switch to production mode so the OAuth callback path is taken
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(import.meta as any).env = { DEV: false }
-
     // Provide code + state to trigger handleWecomCallback
     mockRouteQuery.code = 'abc123'
     mockRouteQuery.state = 'xyz'
@@ -147,9 +146,6 @@ describe('LoginPage', () => {
   })
 
   it('showsError_whenCallbackFails', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(import.meta as any).env = { DEV: false }
-
     mockRouteQuery.code = 'bad-code'
     mockRouteQuery.state = 'bad-state'
 

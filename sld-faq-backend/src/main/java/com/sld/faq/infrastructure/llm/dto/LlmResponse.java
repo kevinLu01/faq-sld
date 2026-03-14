@@ -26,7 +26,8 @@ public class LlmResponse {
         if (choices != null && !choices.isEmpty()) {
             Choice choice = choices.get(0);
             if (choice.getMessage() != null) {
-                return choice.getMessage().getContent();
+                String content = choice.getMessage().getContent();
+                return content != null ? content : "";
             }
         }
         return "";

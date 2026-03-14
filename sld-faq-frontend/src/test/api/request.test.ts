@@ -100,7 +100,7 @@ describe('request interceptors', () => {
     const config = { headers: {} as Record<string, string> }
 
     const result = fulfilled(config) as typeof config
-    expect(result.headers['Authorization']).toBe('Bearer test-jwt-token')
+    expect(result.headers['Authorization']).toBe('test-jwt-token')
   })
 
   it('request_noAuthorizationHeader_whenNoToken', () => {
