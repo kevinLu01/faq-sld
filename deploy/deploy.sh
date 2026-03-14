@@ -5,7 +5,6 @@ set -e
 # 用法: bash deploy/deploy.sh
 
 REPO_DIR="/opt/sld-faq"
-SITE_DIR="/opt/1panel/www/sites/apid.sldbd.com/index"
 
 echo "=== 1. 拉取最新代码 ==="
 cd "$REPO_DIR"
@@ -13,34 +12,19 @@ git pull origin master
 
 echo "=== 2. 准备 .env ==="
 if [ ! -f deploy/.env ]; then
-    cp deploy/.env.prod deploy/.env
-    echo "已创建 deploy/.env，请检查配置后重新运行"
+    cp deploy/.env.prod.example deploy/.env
+    echo "已创建 deploy/.env，请填入实际配置后重新运行"
     exit 1
 fi
 
-echo "=== 3. 构建前端（Docker 内 build）==="
-docker run --rm \
-  -v "$REPO_DIR/sld-faq-frontend:/app" \
-  -w /app \
-  node:22-alpine \
-  sh -c "npm install --registry=https://registry.npmmirror.com && npm run build:prod"
-
-echo "=== 4. 部署前端静态文件 ==="
-# 保留 WW_verify 文件，清除旧的前端文件
-sudo find "$SITE_DIR" -maxdepth 1 ! -name 'WW_verify_*' ! -name '.' -exec rm -rf {} + 2>/dev/null || true
-sudo cp -r "$REPO_DIR/sld-faq-frontend/dist/"* "$SITE_DIR/"
-echo "前端文件已部署到 $SITE_DIR"
-
-echo "=== 5. 构建并启动后端服务 ==="
-cd "$REPO_DIR"
+echo "=== 3. 构建并启动所有服务 ==="
 docker compose -f deploy/docker-compose.prod.yml up -d --build
 
-echo "=== 6. 等待服务就绪 ==="
+echo "=== 4. 等待服务就绪 ==="
 sleep 5
 docker compose -f deploy/docker-compose.prod.yml ps
 
-echo "=== 7. 验证 ==="
-# 检查后端健康
+echo "=== 5. 验证 ==="
 for i in {1..10}; do
     if curl -sf http://127.0.0.1:18081/api/auth/config > /dev/null 2>&1; then
         echo "后端 API 就绪"
@@ -50,9 +34,16 @@ for i in {1..10}; do
     sleep 3
 done
 
+for i in {1..5}; do
+    if curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
+        echo "前端就绪"
+        break
+    fi
+    echo "等待前端启动... ($i/5)"
+    sleep 2
+done
+
 echo ""
 echo "=== 部署完成 ==="
 echo "站点: https://apid.sldbd.com"
-echo "后端: http://127.0.0.1:18081"
-echo ""
-echo "查看日志: docker compose -f deploy/docker-compose.prod.yml logs -f backend"
+echo "查看日志: docker compose -f deploy/docker-compose.prod.yml logs -f"

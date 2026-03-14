@@ -2,11 +2,11 @@ version: '3.8'
 
 # SLD FAQ 生产环境 — 新加坡服务器
 #
-# 仅包含后端 + 基础设施，不含 GPU 服务（vLLM/OCR 在本地机器通过 tailscale 访问）
-# 前端由 1Panel openresty 直接服务静态文件
+# 包含前端 + 后端 + 基础设施，不含 GPU 服务（vLLM/OCR 通过 tailscale/frp 访问）
+# 1Panel openresty 做 HTTPS 终端，反代到前端容器
 #
 # 部署：
-#   cd /opt/sld-faq && docker compose -f deploy/docker-compose.prod.yml up -d
+#   cd /opt/sld-faq && docker compose -f deploy/docker-compose.prod.yml up -d --build
 
 services:
 
@@ -100,6 +100,17 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+
+  frontend:
+    build:
+      context: ../sld-faq-frontend
+      dockerfile: Dockerfile.prod
+    container_name: sld-faq-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
