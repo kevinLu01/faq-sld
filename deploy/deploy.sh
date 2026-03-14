@@ -35,7 +35,7 @@ for i in {1..10}; do
 done
 
 for i in {1..5}; do
-    if curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
+    if curl -sf http://127.0.0.1:3080 > /dev/null 2>&1; then
         echo "前端就绪"
         break
     fi
