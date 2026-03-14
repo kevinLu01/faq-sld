@@ -1,5 +1,3 @@
-version: '3.8'
-
 # SLD FAQ 生产环境 — 新加坡服务器
 #
 # 包含前端 + 后端 + 基础设施，不含 GPU 服务（vLLM/OCR 通过 tailscale/frp 访问）
