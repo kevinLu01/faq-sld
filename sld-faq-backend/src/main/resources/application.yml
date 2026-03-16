@@ -73,7 +73,7 @@ ocr:
   enabled: true
   local:
     base-url: ${OCR_BASE_URL:http://localhost:8866}
-    timeout: 30s
+    timeout: 120s
 
 async:
   faq-task:

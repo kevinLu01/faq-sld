@@ -28,16 +28,18 @@ class OcrEngine:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"[OcrEngine] Loading model from '{MODEL_PATH}' on device={device} ...")
 
+        # TRANSFORMERS_OFFLINE=1 环境变量已在 docker-compose 中设置，
+        # 确保不发起网络请求，直接使用本地缓存的模型文件
         self.tokenizer = AutoTokenizer.from_pretrained(
             MODEL_PATH,
-            trust_remote_code=True
+            trust_remote_code=True,
         )
         self.model = AutoModel.from_pretrained(
             MODEL_PATH,
             # GPU 使用 bfloat16 节省显存；CPU 使用 float32 保证精度
             torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
             device_map=device,
-            trust_remote_code=True
+            trust_remote_code=True,
         )
         self.model.eval()
         self._loaded = True
