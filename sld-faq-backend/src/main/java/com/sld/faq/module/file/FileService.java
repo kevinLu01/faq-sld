@@ -285,8 +285,19 @@ public class FileService {
                 return;
             }
 
-            if (!ocrResult.isSuccess() || ocrResult.getMarkdown().isBlank()) {
-                updateTaskStatus(taskId, "FAILED", 0, "OCR 结果为空");
+            if (!ocrResult.isSuccess()) {
+                log.warn("OCR 识别失败，任务终止: fileId={}, msg={}", kbFile.getId(), ocrResult.getText());
+                updateTaskStatus(taskId, "FAILED", 0, "OCR 识别失败: " + ocrResult.getText());
+                return;
+            }
+            // OCR 成功但无文字内容（如纯图片/空白页），视为正常完成，产品候选为 0
+            if (ocrResult.getMarkdown().isBlank()) {
+                log.info("OCR 结果为空（图片无文字内容）: fileId={}", kbFile.getId());
+                KbFile fileUpdate = new KbFile();
+                fileUpdate.setId(kbFile.getId());
+                fileUpdate.setParseStatus("SUCCESS");
+                kbFileMapper.updateById(fileUpdate);
+                updateTaskStatus(taskId, "SUCCESS", 100, null);
                 return;
             }
             String ocrText = ocrResult.getMarkdown();

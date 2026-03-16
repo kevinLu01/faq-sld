@@ -276,9 +276,12 @@ function pollTaskStatus(id: number) {
         clearInterval(pollTimer!)
         pollTimer = null
         taskFinished.value = true
-        showToast({ message: 'FAQ 生成完成！', type: 'success' })
+        const isImage = uploadedFile.value && ['jpg', 'jpeg', 'png'].includes(
+          uploadedFile.value.fileType?.toLowerCase() ?? ''
+        )
+        showToast({ message: isImage ? '处理完成！' : 'FAQ 生成完成！', type: 'success' })
         setTimeout(() => {
-          router.push('/review/list')
+          router.push(isImage ? '/product/review/list' : '/review/list')
         }, 1500)
       } else if (status.status === 'FAILED') {
         clearInterval(pollTimer!)
