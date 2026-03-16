@@ -1,7 +1,7 @@
 package com.sld.faq.module.product.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.sld.faq.common.JsonbTypeHandler;
+import com.sld.faq.config.JsonbTypeHandler;
 import lombok.Data;
 
 import java.time.LocalDateTime;
