@@ -13,6 +13,9 @@ import com.sld.faq.module.file.mapper.KbTaskMapper;
 import com.sld.faq.module.file.vo.FileVO;
 import com.sld.faq.module.file.vo.TaskStatusVO;
 import com.sld.faq.module.generate.FaqGenerationService;
+import com.sld.faq.module.product.ProductGenerationService;
+import com.sld.faq.infrastructure.ocr.OcrClient;
+import com.sld.faq.infrastructure.ocr.OcrResult;
 import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +27,7 @@ import org.apache.tika.Tika;
 
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
+import org.springframework.scheduling.annotation.Async;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -37,7 +41,11 @@ import java.util.stream.Collectors;
 public class FileService {
 
     private static final long MAX_FILE_SIZE = 50L * 1024 * 1024; // 50MB
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "docx", "xlsx", "txt", "csv");
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            "pdf", "docx", "xlsx", "txt", "csv",
+            "jpg", "jpeg", "png"
+    );
+    private static final Set<String> IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png");
     private static final Set<String> ALLOWED_MIME_TYPES = Set.of(
             "application/pdf",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -46,7 +54,9 @@ public class FileService {
             "application/x-tika-ooxml",
             "text/plain",
             "text/csv",
-            "application/csv"
+            "application/csv",
+            "image/jpeg",
+            "image/png"
     );
     private static final DateTimeFormatter DT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final Tika TIKA = new Tika();
@@ -55,6 +65,8 @@ public class FileService {
     private final KbTaskMapper kbTaskMapper;
     private final MinioStorage minioStorage;
     private final FaqGenerationService faqGenerationService;
+    private final ProductGenerationService productGenerationService;
+    private final OcrClient ocrClient;
 
     /**
      * 上传文件：校验类型 → 存 MinIO → 保存 kb_file，返回 FileVO
@@ -73,7 +85,7 @@ public class FileService {
         }
         String ext = extractExtension(originalName).toLowerCase();
         if (!ALLOWED_EXTENSIONS.contains(ext)) {
-            throw new BusinessException("不支持的文件类型，允许：pdf, docx, xlsx, txt, csv");
+            throw new BusinessException("不支持的文件类型，允许：pdf, docx, xlsx, txt, csv, jpg, jpeg, png");
         }
         // 校验文件真实类型（Magic Number），防止后缀伪造
         validateMimeType(file);
@@ -160,10 +172,15 @@ public class FileService {
         task.setProgress(0);
         kbTaskMapper.insert(task);
 
-        // 提交异步任务
-        faqGenerationService.generateAsync(fileId, task.getId());
+        // 图片文件走产品提取专用路径（OCR → LLM → 产品候选）
+        if (IMAGE_EXTENSIONS.contains(kbFile.getFileType().toLowerCase())) {
+            triggerImageProductExtractAsync(kbFile, task.getId());
+        } else {
+            // 文档类文件走 FAQ 生成（内部会同时触发产品提取双轨）
+            faqGenerationService.generateAsync(fileId, task.getId());
+        }
 
-        log.info("FAQ 生成任务已提交: fileId={}, taskId={}", fileId, task.getId());
+        log.info("生成任务已提交: fileId={}, taskId={}, type={}", fileId, task.getId(), kbFile.getFileType());
         return task.getId();
     }
 
@@ -243,6 +260,62 @@ public class FileService {
      * 使用 Apache Tika 检测文件真实 MIME 类型（Magic Number 校验），
      * 防止攻击者将非法文件伪装成合法后缀进行上传。
      */
+    /**
+     * 图片文件异步产品提取：OCR → LLM PRODUCT 模式 → 保存 product_candidate
+     */
+    @Async("faqTaskExecutor")
+    public void triggerImageProductExtractAsync(KbFile kbFile, Long taskId) {
+        log.info("图片产品提取任务开始: fileId={}, taskId={}", kbFile.getId(), taskId);
+        try {
+            updateTaskStatus(taskId, "RUNNING", 10, null);
+
+            byte[] fileBytes;
+            try (java.io.InputStream is = minioStorage.download(kbFile.getMinioPath())) {
+                fileBytes = is.readAllBytes();
+            } catch (Exception e) {
+                updateTaskStatus(taskId, "FAILED", 0, "下载图片失败: " + e.getMessage());
+                return;
+            }
+
+            OcrResult ocrResult;
+            try {
+                ocrResult = ocrClient.ocr(fileBytes, kbFile.getOriginalName());
+            } catch (Exception e) {
+                updateTaskStatus(taskId, "FAILED", 0, "OCR 识别失败: " + e.getMessage());
+                return;
+            }
+
+            if (!ocrResult.isSuccess() || ocrResult.getMarkdown().isBlank()) {
+                updateTaskStatus(taskId, "FAILED", 0, "OCR 结果为空");
+                return;
+            }
+            String ocrText = ocrResult.getMarkdown();
+
+            updateTaskStatus(taskId, "RUNNING", 60, null);
+            productGenerationService.extractProductsFromOcrText(kbFile.getId(), ocrText);
+
+            KbFile fileUpdate = new KbFile();
+            fileUpdate.setId(kbFile.getId());
+            fileUpdate.setParseStatus("SUCCESS");
+            kbFileMapper.updateById(fileUpdate);
+
+            updateTaskStatus(taskId, "SUCCESS", 100, null);
+            log.info("图片产品提取完成: fileId={}, taskId={}", kbFile.getId(), taskId);
+        } catch (Exception e) {
+            log.error("图片产品提取任务异常: fileId={}, taskId={}", kbFile.getId(), taskId, e);
+            updateTaskStatus(taskId, "FAILED", 0, e.getMessage());
+        }
+    }
+
+    private void updateTaskStatus(Long taskId, String status, int progress, String errorMsg) {
+        KbTask task = new KbTask();
+        task.setId(taskId);
+        task.setStatus(status);
+        task.setProgress(progress);
+        task.setErrorMsg(errorMsg);
+        kbTaskMapper.updateById(task);
+    }
+
     private void validateMimeType(MultipartFile file) {
         try {
             String detectedType = TIKA.detect(file.getInputStream(), file.getOriginalFilename());

@@ -85,7 +85,8 @@
     <!-- Tabbar -->
     <van-tabbar v-model="activeTab" fixed placeholder>
       <van-tabbar-item icon="home-o" name="home" @click="router.push('/home')">首页</van-tabbar-item>
-      <van-tabbar-item icon="passed" name="review" @click="router.push('/review/list')">审核</van-tabbar-item>
+      <van-tabbar-item icon="passed" name="review" @click="router.push('/review/list')">FAQ审核</van-tabbar-item>
+      <van-tabbar-item icon="shop-o" name="product" @click="router.push('/product/list')">产品库</van-tabbar-item>
       <van-tabbar-item icon="records-o" name="faq" @click="router.push('/faq/list')">FAQ</van-tabbar-item>
       <van-tabbar-item icon="contact-o" name="me" @click="router.push('/me')">我的</van-tabbar-item>
     </van-tabbar>
@@ -121,9 +122,11 @@ const greeting = computed(() => {
 
 const quickEntries = [
   { label: '上传资料', path: '/upload', icon: 'upgrade', bg: '#1989fa' },
-  { label: '审核中心', path: '/review/list', icon: 'passed', bg: '#07c160' },
-  { label: 'FAQ 库', path: '/faq/list', icon: 'records-o', bg: '#ff976a' },
-  { label: '我的', path: '/me', icon: 'contact-o', bg: '#7232dd' },
+  { label: 'FAQ 审核', path: '/review/list', icon: 'passed', bg: '#07c160' },
+  { label: '产品审核', path: '/product/review/list', icon: 'orders-o', bg: '#ff976a' },
+  { label: '产品库', path: '/product/list', icon: 'shop-o', bg: '#7232dd' },
+  { label: 'FAQ 库', path: '/faq/list', icon: 'records-o', bg: '#10aeff' },
+  { label: '我的', path: '/me', icon: 'contact-o', bg: '#969799' },
 ]
 
 async function loadStats() {

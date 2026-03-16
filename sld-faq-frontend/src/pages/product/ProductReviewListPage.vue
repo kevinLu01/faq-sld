@@ -1,0 +1,42 @@
+<template>
+  <div class="review-list-page">
+    <van-nav-bar
+      title="产品审核"
+      left-arrow
+      @click-left="router.back()"
+      fixed
+      placeholder
+    />
+    <van-tabs v-model:active="activeStatus" @change="onTabChange" sticky offset-top="46">
+      <van-tab title="待审核" name="PENDING">
+        <ProductCandidateListPanel status="PENDING" :refresh-trigger="refreshTrigger" />
+      </van-tab>
+      <van-tab title="已审核" name="REVIEWED">
+        <ProductCandidateListPanel status="REVIEWED" :refresh-trigger="refreshTrigger" />
+      </van-tab>
+    </van-tabs>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import ProductCandidateListPanel from '@/components/ProductCandidateListPanel.vue'
+
+const router = useRouter()
+const route = useRoute()
+const activeStatus = ref('PENDING')
+const refreshTrigger = ref(0)
+
+function onTabChange() {
+  refreshTrigger.value++
+}
+
+watch(() => route.query.refresh, (val) => {
+  if (val) refreshTrigger.value++
+})
+</script>
+
+<style scoped>
+.review-list-page { min-height: 100vh; background: #f5f5f5; }
+</style>

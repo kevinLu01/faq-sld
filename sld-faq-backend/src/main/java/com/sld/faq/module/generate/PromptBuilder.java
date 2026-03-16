@@ -27,6 +27,25 @@ public class PromptBuilder {
             "严格按以下 JSON 输出，不要输出任何其他内容：\n" +
             "{\"faqs\":[{\"question\":\"...\",\"answer\":\"...\",\"category\":\"...\",\"keywords\":\"...\",\"source_summary\":\"...\",\"confidence\":0.9}]}";
 
+    private static final String PRODUCT_TEMPLATE =
+            "你是一个专业的产品档案整理助手，服务于制造业（空调配件）代理企业。\n" +
+            "以下是从产品说明书或产品资料中提取的文本内容：\n\n" +
+            "---\n" +
+            "{CONTENT}\n" +
+            "---\n\n" +
+            "请从以上内容提取 0~3 条产品档案信息。\n\n" +
+            "要求：\n" +
+            "1. 只能基于原文，不能编造原文中没有的信息\n" +
+            "2. model 为产品型号（如 KFR-35GW），name 为产品名称（如 变频空调挂机）\n" +
+            "3. brand 为品牌/厂家名称\n" +
+            "4. specs 为规格参数对象，键为参数名，值为参数值（如 {\"制冷量\":\"3500W\",\"电压\":\"220V\"}）\n" +
+            "5. compat_models 为适配主机型号，多个用逗号分隔，无则留空\n" +
+            "6. category 从以下选项选择：空调整机、室外机配件、室内机配件、制冷配件、电控配件、其他\n" +
+            "7. confidence 为 0.0~1.0 的置信度\n" +
+            "8. 如果文本不含有效产品信息，返回空数组\n\n" +
+            "严格按以下 JSON 输出，不要输出任何其他内容：\n" +
+            "{\"products\":[{\"name\":\"...\",\"model\":\"...\",\"brand\":\"...\",\"specs\":{\"制冷量\":\"...\"},\"compat_models\":\"...\",\"category\":\"...\",\"source_summary\":\"...\",\"confidence\":0.9}]}";
+
     private static final String CONVERSATION_TEMPLATE =
             "你是一个专业的知识库整理助手，服务于制造业（空调配件）企业。\n" +
             "以下是企业内部工作群的聊天记录片段：\n\n" +
@@ -53,6 +72,7 @@ public class PromptBuilder {
         String template = switch (mode) {
             case DOCUMENT -> DOCUMENT_TEMPLATE;
             case CONVERSATION -> CONVERSATION_TEMPLATE;
+            case PRODUCT -> PRODUCT_TEMPLATE;
         };
         return template.replace("{CONTENT}", chunkContent);
     }

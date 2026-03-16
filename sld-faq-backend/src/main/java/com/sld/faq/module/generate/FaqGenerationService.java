@@ -15,6 +15,7 @@ import com.sld.faq.module.generate.dto.FaqCandidateDto;
 import com.sld.faq.module.parse.ChunkService;
 import com.sld.faq.module.parse.DocumentParseService;
 import com.sld.faq.module.parse.TextCleaner;
+import com.sld.faq.module.product.ProductGenerationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,7 @@ public class FaqGenerationService {
     private final FaqJsonParser faqJsonParser;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final ProductGenerationService productGenerationService;
 
     /**
      * 自注入自身代理，使 saveChunks/saveCandidates 上的 @Transactional 通过 AOP 代理生效。
@@ -167,6 +169,13 @@ public class FaqGenerationService {
             if (generatedCandidateCount == 0 && llmFailureCount > 0) {
                 failTask(taskId, buildGenerationFailureMessage(llmFailureCount, total, llmErrors));
                 return;
+            }
+
+            // 10b. 同批 chunks 做产品提取（双轨输出，失败不影响 FAQ 任务状态）
+            try {
+                productGenerationService.extractProducts(fileId, savedChunks);
+            } catch (Exception e) {
+                log.warn("产品提取失败，不影响 FAQ 任务: fileId={}, error={}", fileId, e.getMessage());
             }
 
             updateTask(taskId, "SUCCESS", 100, null);

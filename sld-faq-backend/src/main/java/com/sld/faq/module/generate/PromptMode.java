@@ -8,5 +8,6 @@ package com.sld.faq.module.generate;
  */
 public enum PromptMode {
     DOCUMENT,
-    CONVERSATION
+    CONVERSATION,
+    PRODUCT
 }

@@ -67,6 +67,38 @@ export interface SourceRef {
   chunkContent: string
 }
 
+export interface ProductCandidateVO {
+  id: number
+  fileId: number
+  fileName?: string
+  name: string
+  model: string
+  brand: string
+  specs?: string        // JSON 字符串
+  compatModels?: string // 逗号分隔
+  category?: string
+  sourceSummary?: string
+  confidence?: number
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  rejectReason?: string
+  createdAt: string
+}
+
+export interface ProductVO {
+  id: number
+  name: string
+  model: string
+  brand: string
+  categoryId?: number
+  categoryName?: string
+  specs?: string
+  compatModels?: string
+  description?: string
+  status: number
+  publishedAt?: string
+  createdAt: string
+}
+
 export interface LoginResponse {
   token: string
   user: UserInfo

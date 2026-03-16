@@ -27,7 +27,7 @@
                 <div class="upload-trigger">
                   <van-icon name="cloud-upload-o" size="48" color="#1989fa" />
                   <p class="upload-hint">点击选择文件</p>
-                  <p class="upload-formats">支持 PDF / DOCX / XLSX / TXT / CSV</p>
+                  <p class="upload-formats">支持 PDF / DOCX / XLSX / TXT / CSV / 图片</p>
                   <p class="upload-limit">最大 50MB</p>
                 </div>
               </van-uploader>
@@ -159,13 +159,13 @@ const taskStatusText = ref('正在处理...')
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
-const ALLOWED_EXTS = ['.pdf', '.docx', '.xlsx', '.txt', '.csv']
+const ALLOWED_EXTS = ['.pdf', '.docx', '.xlsx', '.txt', '.csv', '.jpg', '.jpeg', '.png']
 
 function beforeRead(file: File | File[]): boolean {
   const f = Array.isArray(file) ? file[0] : file
   const ext = '.' + f.name.split('.').pop()?.toLowerCase()
   if (!ALLOWED_EXTS.includes(ext)) {
-    showToast('不支持该文件类型，请上传 PDF / DOCX / XLSX / TXT / CSV')
+    showToast('不支持该文件类型，请上传 PDF / DOCX / XLSX / TXT / CSV / JPG / PNG')
     return false
   }
   return true

@@ -50,6 +50,30 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/product/review/list',
+      name: 'ProductReviewList',
+      component: () => import('@/pages/product/ProductReviewListPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/product/review/detail/:id',
+      name: 'ProductReviewDetail',
+      component: () => import('@/pages/product/ProductReviewDetailPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/product/list',
+      name: 'ProductList',
+      component: () => import('@/pages/product/ProductListPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/product/detail/:id',
+      name: 'ProductDetail',
+      component: () => import('@/pages/product/ProductDetailPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/me',
       name: 'Me',
       component: () => import('@/pages/MePage.vue'),

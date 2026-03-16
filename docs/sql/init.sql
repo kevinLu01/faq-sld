@@ -324,3 +324,77 @@ SELECT u.id, r.id
 FROM sys_user u
          JOIN sys_role r ON r.code = 'ADMIN'
 WHERE u.wecom_user_id = 'admin001';
+
+-- ============================================================
+-- 产品库模块
+-- ============================================================
+
+-- ----------------------------------------------------------
+-- product_candidate：LLM 提取的产品候选，待人工审核
+-- ----------------------------------------------------------
+CREATE TABLE product_candidate (
+    id             BIGSERIAL    PRIMARY KEY,
+    file_id        BIGINT       NOT NULL REFERENCES kb_file(id),
+    chunk_id       BIGINT       REFERENCES kb_chunk(id),
+    name           VARCHAR(200),                        -- 产品名称
+    model          VARCHAR(100),                        -- 型号
+    brand          VARCHAR(100),                        -- 厂家/品牌
+    specs          JSONB,                               -- 规格参数 {"制冷量":"3.5kW","电压":"220V"}
+    compat_models  TEXT,                               -- 适配机型（逗号分隔）
+    category       VARCHAR(100),
+    source_summary TEXT,
+    confidence     FLOAT        NOT NULL DEFAULT 0.5,
+    status         VARCHAR(20)  NOT NULL DEFAULT 'PENDING', -- PENDING/APPROVED/REJECTED
+    reject_reason  TEXT,
+    reviewer_id    BIGINT       REFERENCES sys_user(id),
+    reviewed_at    TIMESTAMP,
+    created_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_product_candidate_file   ON product_candidate(file_id);
+CREATE INDEX idx_product_candidate_status ON product_candidate(status);
+
+COMMENT ON TABLE  product_candidate                IS '产品候选表（LLM 提取，待审核）';
+COMMENT ON COLUMN product_candidate.specs          IS '规格参数 JSON，键值对灵活存储';
+COMMENT ON COLUMN product_candidate.compat_models  IS '适配机型，逗号分隔';
+
+-- ----------------------------------------------------------
+-- product_item：已审核通过的正式产品档案
+-- ----------------------------------------------------------
+CREATE TABLE product_item (
+    id             BIGSERIAL    PRIMARY KEY,
+    name           VARCHAR(200) NOT NULL,
+    model          VARCHAR(100),
+    brand          VARCHAR(100),
+    category_id    BIGINT       REFERENCES faq_category(id),
+    specs          JSONB,
+    compat_models  TEXT,
+    description    TEXT,
+    status         INTEGER      NOT NULL DEFAULT 1,     -- 1=上架 0=下架
+    publisher_id   BIGINT       REFERENCES sys_user(id),
+    published_at   TIMESTAMP,
+    created_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_product_item_category ON product_item(category_id);
+CREATE INDEX idx_product_item_status   ON product_item(status);
+CREATE INDEX idx_product_item_model    ON product_item(model);
+
+COMMENT ON TABLE  product_item              IS '产品档案表（已审核发布）';
+COMMENT ON COLUMN product_item.specs        IS '规格参数 JSON';
+COMMENT ON COLUMN product_item.compat_models IS '适配机型，逗号分隔';
+
+-- ----------------------------------------------------------
+-- product_source_ref：产品档案 ↔ 来源文件的溯源关联
+-- ----------------------------------------------------------
+CREATE TABLE product_source_ref (
+    id             BIGSERIAL PRIMARY KEY,
+    product_id     BIGINT    NOT NULL REFERENCES product_item(id),
+    candidate_id   BIGINT    REFERENCES product_candidate(id),
+    file_id        BIGINT    REFERENCES kb_file(id),
+    created_at     TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE product_source_ref IS '产品档案来源溯源表';
